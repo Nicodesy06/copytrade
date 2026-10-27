@@ -209,3 +209,31 @@ async def test_events_during_stop_are_deferred_not_lost(tmp_path):
 
     with rt.db.session() as s:
         assert s.scalars(select(DecisionRow)).first() is not None
+
+
+def test_control_audit_shows_real_transition_and_level(tmp_path):
+    from sqlalchemy import select
+
+    from m4desk.storage.db import AuditLog
+
+    db = Database(tmp_path / "c.db")
+    db.set_control("state", "STOPPED", "human", "ARRESTA")
+    db.set_control("state", "RUNNING", "human", "avvio")
+    db.set_control("live_armed", "boot1", "human", "LIVE ARMATO")
+    db.set_control("state", "SAFE", "audit", "invariante")
+    with db.session() as s:
+        rows = [(a.level, a.message) for a in s.scalars(select(AuditLog).order_by(AuditLog.id))]
+    assert rows[0] == ("INFO", "state: - -> STOPPED (ARRESTA)")
+    assert rows[1] == ("INFO", "state: STOPPED -> RUNNING (avvio)")
+    assert rows[2][0] == "WARN" and rows[2][1].startswith("live_armed: - -> boot1")
+    assert rows[3] == ("WARN", "state: RUNNING -> SAFE (invariante)")
+
+
+def test_dashboard_llm_status_is_real(tmp_path):
+    from m4desk.config import AppConfig, LLMConfig
+    from m4desk.web.views import Views
+
+    v = Views(Database(tmp_path / "v.db"), AppConfig(llm=LLMConfig(base_url="http://127.0.0.1:9")))
+    assert v.llm_status()[0] == "NON_RAGGIUNGIBILE"
+    v2 = Views(Database(tmp_path / "v2.db"), AppConfig(llm=LLMConfig(enabled=False)))
+    assert v2.llm_status()[0] == "DISABILITATO"

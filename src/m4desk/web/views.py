@@ -143,9 +143,31 @@ class Views:
             out.append({"name": name, "status": status, "requests": req, "cap": b.daily_requests,
                         "r429": u.rate_limited if u else 0, "errors": u.errors if u else 0,
                         "note": f"cache hit {u.cache_hits if u else 0}"})
-        out.append({"name": "LLM", "status": "OK" if self.cfg.llm.enabled else "DISABILITATO", "requests": "-",
-                    "cap": "locale", "r429": 0, "errors": 0, "note": self.db.get_meta("llm_backend", "")})
+        status, note = self.llm_status()
+        out.append({"name": "LLM", "status": status, "requests": "-", "cap": "locale", "r429": 0, "errors": 0,
+                    "note": note})
         return out
+
+    def llm_status(self) -> tuple[str, str]:
+        """Stato REALE di Ollama (verificato al massimo una volta al minuto), non solo la configurazione."""
+        import time
+
+        import httpx
+
+        if not self.cfg.llm.enabled:
+            return "DISABILITATO", "llm.enabled: false"
+        cached = getattr(self, "_llm_cache", None)
+        if cached and time.monotonic() - cached[0] < 60:
+            return cached[1]
+        try:
+            r = httpx.get(self.cfg.llm.base_url.rstrip("/") + "/api/tags", timeout=0.8, trust_env=False)
+            names = [m.get("name") for m in r.json().get("models", [])]
+            res = ("OK", self.cfg.llm.model) if self.cfg.llm.model in names else (
+                "MODELLO_MANCANTE", f"esegui: ollama pull {self.cfg.llm.model}")
+        except Exception:
+            res = ("NON_RAGGIUNGIBILE", "Ollama non attivo: si usa la classifica deterministica")
+        self._llm_cache = (time.monotonic(), res)
+        return res
 
     # --- agenti --------------------------------------------------------------------
     def agents(self) -> dict[str, Any]:

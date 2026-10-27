@@ -444,14 +444,17 @@ class Database:
     def set_control(self, key: str, value: str, actor: str, reason: str | None = None) -> None:
         with self.session() as s:
             old = s.get(Control, key)
+            old_value = (old.value or "-") if old else "-"  # letto PRIMA del merge, che aggiorna lo stesso oggetto
             s.merge(Control(key=key, value=value, reason=reason, updated_at=utcnow(), actor=actor))
+            # avviso solo per ciò che conta: soldi veri (live) e modalità sicura; avvii/arresti sono routine
+            level = "WARN" if key == "live_armed" or value == "SAFE" else "INFO"
             s.add(
                 AuditLog(
                     ts=utcnow(),
                     actor=actor,
                     action=f"control.{key}",
-                    level="WARN",
-                    message=f"{key}: {old.value if old else '-'} -> {value}" + (f" ({reason})" if reason else ""),
+                    level=level,
+                    message=f"{key}: {old_value} -> {value or '-'}" + (f" ({reason})" if reason else ""),
                     data={"key": key, "value": value, "reason": reason},
                 )
             )

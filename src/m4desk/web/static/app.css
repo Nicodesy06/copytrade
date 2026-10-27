@@ -83,7 +83,7 @@ table.compact th, table.compact td { padding: 6px 8px; }
 .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: var(--panel-2); border: 1px solid var(--line); white-space: nowrap; }
 .tag.copy, .t-filled, .ck-pass, .sc-eligible, .ls-selected, .st-ok, .st-idle, .st-running, .st-fixture { background: color-mix(in srgb, var(--pos) 14%, transparent); color: var(--pos); border-color: transparent; }
 .tag.skip, .t-rejected, .t-failed, .t-unfillable, .ck-fail, .ls-blocked, .lvl-error, .st-disabilitato, .st-budget_esaurito, .st-circuit_open, .st-stopped { background: color-mix(in srgb, var(--neg) 13%, transparent); color: var(--neg); border-color: transparent; }
-.ck-unavailable, .sc-below_threshold, .sc-insufficient_data, .lvl-warn, .t-pending, .st-mock, .ls-manage_only { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); border-color: transparent; }
+.st-non_raggiungibile, .st-modello_mancante, .ck-unavailable, .sc-below_threshold, .sc-insufficient_data, .lvl-warn, .t-pending, .st-mock, .ls-manage_only { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); border-color: transparent; }
 .list { list-style: none; margin: 0; padding: 0; }
 .list li { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .list li:last-child { border-bottom: 0; }

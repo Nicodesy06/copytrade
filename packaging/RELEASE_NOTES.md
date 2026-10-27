@@ -1,4 +1,13 @@
-## M4 CopyDesk 0.1.1 — app per Mac (Apple Silicon)
+## M4 CopyDesk 0.1.2 — app per Mac (Apple Silicon)
+
+### Novità della 0.1.2
+- **Correzione importante del live**: armando da app, dashboard o CLI veniva armata una sessione diversa da
+  quella del motore, che quindi non operava (la dashboard mostrava comunque "LIVE ARMATO"). Ora si arma il
+  motore in esecuzione. Dopo l'aggiornamento: avvia il motore e ripeti ARMA LIVE.
+- **Controllo completo**: pulsante CONTROLLO in ogni pagina, voce di menu "Controllo completo" e comando
+  `m4desk check`. Verifica motore, agenti, database, provider (prova reale), IA locale, trader, live,
+  notifiche (invia una notifica di prova) e Mac, con l'azione da fare per ogni problema.
+- Registro: transizioni di stato corrette; avvisi solo per live e modalità sicura; stato reale di Ollama.
 
 ### Novità della 0.1.1
 - Preflight del live più chiaro: se la chiave importata appartiene a un indirizzo diverso da
@@ -8,7 +17,7 @@
 
 Sistema locale di **ricerca** sul copy-trading Solana. Non è una promessa di rendimento.
 
-**Scarica** `M4-CopyDesk-0.1.1-macOS-arm64.dmg` qui sotto (verifica con il file `.sha256`).
+**Scarica** `M4-CopyDesk-0.1.2-macOS-arm64.dmg` qui sotto (verifica con il file `.sha256`).
 
 ### Cosa contiene
 - App nella barra dei menu ("M4") con dashboard locale in italiano su `http://127.0.0.1:8765`.

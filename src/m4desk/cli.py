@@ -406,6 +406,27 @@ def cmd_test_providers(args) -> int:
     return 1 if bad else 0
 
 
+# ------------------------------------------------------------------------------------------ check
+def cmd_check(args) -> int:
+    from .services.healthcheck import run_full_check
+
+    cfg = _cfg(args)
+    db = _open_db(cfg, args.db, must_exist=False)
+    print("Controllo completo in corso (prove reali sui provider, nessuna firma, nessun ordine)…\n")
+    res = asyncio.run(run_full_check(cfg, load_secrets(), db, send_test_notification=not args.no_notify))
+    area = None
+    for i in res["items"]:
+        if i["area"] != area:
+            area = i["area"]
+            print(f"\n{area}")
+        print(f"  [{i['status']:^10}] {i['name']}: {i['detail']}")
+        if i["fix"]:
+            print(f"               → {i['fix']}")
+    c = res["counts"]
+    print(f"\nEsito: {res['verdict']} (OK {c['OK']} · attenzione {c['ATTENZIONE']} · errori {c['ERRORE']})")
+    return 1 if res["status"] == "ERRORE" else 0
+
+
 # ------------------------------------------------------------------------------------------ live
 LIVE_WARNING = """
 ATTENZIONE — ESECUZIONE REALE
@@ -424,12 +445,8 @@ def _live_executor(cfg: AppConfig, db_which: str = "paper"):
     secrets = load_secrets()
     db = _open_db(cfg, db_which, must_exist=False)
     topic = secrets.ntfy_topic.get_secret_value() if secrets.ntfy_topic else None
+    # engine=False: si agisce sulla sessione registrata dal motore in esecuzione
     live = build_live(cfg, db, Clock(), secrets, Notifier(cfg.notify, topic))
-    if live is not None:
-        # i comandi CLI agiscono sul motore in esecuzione: stesso boot id del processo motore
-        boot = db.get_meta("engine_boot_id")
-        if boot:
-            live.boot_id = boot
     return live, db
 
 
@@ -573,6 +590,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(fn=cmd_report)
     sub.add_parser("test-providers", help="prova i provider gratuiti (USA LA RETE, solo letture)").set_defaults(
         fn=cmd_test_providers)
+    sp = sub.add_parser("check", help="CONTROLLO COMPLETO: motore, dati, provider, IA, live, notifiche, Mac")
+    db_arg(sp)
+    sp.add_argument("--no-notify", action="store_true", help="non inviare la notifica di prova")
+    sp.set_defaults(fn=cmd_check)
     sp = sub.add_parser("live", help="esecuzione REALE opt-in: chiave, preflight, arma/disarma, stato")
     lsub = sp.add_subparsers(dest="live_cmd", required=True)
     lsub.add_parser("import-key", help="importa la chiave privata nel Portachiavi (input nascosto)")

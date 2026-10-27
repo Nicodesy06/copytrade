@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "m4-copydesk"
-version = "0.1.1"
+version = "0.1.2"
 description = "M4 CopyDesk: sistema locale multi-agente di ricerca copy-trading Solana (solo PAPER)"
 readme = "README.md"
 requires-python = ">=3.12"

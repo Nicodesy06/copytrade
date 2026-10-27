@@ -177,7 +177,7 @@ def build_paper_engine(cfg: AppConfig, secrets: Secrets, db_path: str | Path) ->
 
     topic = secrets.ntfy_topic.get_secret_value() if secrets.ntfy_topic else None
     rt.notifier = Notifier(cfg.notify, topic)
-    rt.live = build_live(cfg, db, clock, secrets, rt.notifier)
+    rt.live = build_live(cfg, db, clock, secrets, rt.notifier, engine=True)
     db.set_meta("live", {"enabled": cfg.live_enabled, "wallet": cfg.live.wallet_pubkey})
     seeds = list(cfg.seed_wallets) + [w.address for w in db.list_wallets() if w.source == "manual"]
     return rt, Supervisor(rt, seeds)

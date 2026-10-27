@@ -167,7 +167,7 @@ def make_live(tmp_path, **live_kw):
 
     notifier = Notifier(cfg.notify, "m4desk-test-topic", transport)
     clock = SimClock(S)
-    live = build_live(cfg, db, clock, Secrets(), notifier, ks, transport)
+    live = build_live(cfg, db, clock, Secrets(), notifier, ks, transport, engine=True)
     return live, chain, kp, db
 
 
@@ -247,7 +247,8 @@ async def test_preflight_and_arming(tmp_path):
     # riavvio del motore = nuovo boot id ⇒ disarmato
     from m4desk.config import Secrets
 
-    live2 = build_live(live.cfg, db, live.clock, Secrets(), None, live.keys, httpx.MockTransport(chain.handler))
+    live2 = build_live(live.cfg, db, live.clock, Secrets(), None, live.keys, httpx.MockTransport(chain.handler),
+                       engine=True)
     assert not live2.is_armed()
 
 
@@ -451,3 +452,21 @@ def test_cli_use_key_address(tmp_path, monkeypatch, capsys):
     KeyStore(mem).store(_b58encode(bytes(kp)))
     assert cli.main(["live", "use-key-address"]) == 0
     assert load_config(tmp_path / "config.yaml").live.wallet_pubkey == str(kp.pubkey())
+
+
+async def test_arming_from_cli_or_app_arms_the_running_engine(tmp_path):
+    """Regressione: armare da CLI/app/dashboard deve armare la sessione del MOTORE, non una nuova."""
+    from m4desk.config import Secrets
+
+    engine_live, chain, kp, db = make_live(tmp_path)
+    t = httpx.MockTransport(chain.handler)
+    control = build_live(engine_live.cfg, db, engine_live.clock, Secrets(), None, engine_live.keys, t)
+    assert control.boot_id == engine_live.boot_id and db.get_meta("engine_boot_id") == engine_live.boot_id
+    ok, msg = await control.arm(CONFIRM_PHRASE)
+    assert ok, msg
+    assert engine_live.is_armed()  # il motore vede l'armamento
+    # senza motore registrato non si può armare
+    db.set_meta("engine_boot_id", "")
+    orphan = build_live(engine_live.cfg, db, engine_live.clock, Secrets(), None, engine_live.keys, t)
+    ok, msg = await orphan.arm(CONFIRM_PHRASE)
+    assert not ok and "non è in esecuzione" in msg

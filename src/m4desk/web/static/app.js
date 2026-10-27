@@ -68,7 +68,25 @@
     } finally { btn.disabled = false; }
   }
 
+  async function runCheck(btn) {
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = "Controllo in corso… (10-30 s)";
+    try {
+      const r = await fetch("/api/check", { method: "POST", headers: { "Content-Type": "application/json",
+        "X-M4-Token": token() }, body: "{}", credentials: "same-origin" });
+      if (!r.ok) window.alert("Controllo non eseguito (" + r.status + ")");
+      window.location.href = "/controllo";
+    } finally { btn.disabled = false; btn.textContent = old; }
+  }
+  window.addEventListener("load", () => {
+    const b = document.querySelector("button[data-check]");
+    if (b && new URLSearchParams(window.location.search).get("run") === "1") runCheck(b);
+  });
+
   document.addEventListener("click", (ev) => {
+    const cb = ev.target.closest("button[data-check]");
+    if (cb) { ev.preventDefault(); runCheck(cb); return; }
     const lb = ev.target.closest("button[data-live]");
     if (lb) { ev.preventDefault(); liveAction(lb); return; }
     const b = ev.target.closest("button[data-action]");

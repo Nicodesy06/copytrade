@@ -122,6 +122,7 @@ m4desk live status | m4desk live disarm | m4desk live forget-key
 | `m4desk stop [--db …]` | ARRESTA il motore |
 | `m4desk status [--db …]` | stato, agenti, equity simulata |
 | `m4desk report [--db …] [--day AAAA-MM-GG] [--generate]` | report giornaliero in italiano |
+| `m4desk check [--no-notify]` | **CONTROLLO COMPLETO**: motore, agenti, DB, provider (prova reale), IA, trader, live, notifiche, Mac |
 | `m4desk test-providers` | probe dei provider gratuiti (rete, solo letture) |
 | `m4desk live import-key\|forget-key\|status\|preflight\|arm\|disarm` | esecuzione REALE opt-in (vedi sopra) |
 | `m4desk budget [--db …]` | budget e consumo dei provider |

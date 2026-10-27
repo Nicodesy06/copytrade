@@ -337,6 +337,7 @@ def run_menubar(ctl: Controller) -> None:
             self.login_item.state = int(login_item_enabled())
             self.menu = [
                 rumps.MenuItem("Apri dashboard", callback=lambda _: webbrowser.open(ctl.url())),
+                rumps.MenuItem("Controllo completo", callback=lambda _: webbrowser.open(ctl.url() + "controllo?run=1")),
                 None,
                 self.engine_item,
                 rumps.MenuItem("Pausa nuovi acquisti", callback=lambda _: self.notify(

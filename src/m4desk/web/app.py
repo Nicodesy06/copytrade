@@ -177,6 +177,20 @@ def create_app(db_paths: str | Path | dict[str, Path], cfg: AppConfig, secrets: 
     def logs(request: Request, level: str | None = None):
         return render(request, "logs.html", V(request).logs(level), "/log")
 
+    @app.get("/controllo", response_class=HTMLResponse)
+    def check_page(request: Request):
+        d = dbs.get("paper") or dbs.get("default") or dbs[first]
+        ctx = {**V(request).common(), "last": d.get_meta("last_check")}
+        return render(request, "check.html", ctx, "/controllo")
+
+    @app.post("/api/check")
+    async def run_check(request: Request):
+        _check_write(request)
+        from ..services.healthcheck import run_full_check
+
+        d = dbs.get("paper") or dbs.get("default") or dbs[first]
+        return await run_full_check(cfg, secrets, d, send_test_notification=True)
+
     @app.get("/live", response_class=HTMLResponse)
     def live_page(request: Request):
         return render(request, "live.html", V(request).live(), "/live")
@@ -197,11 +211,9 @@ def create_app(db_paths: str | Path | dict[str, Path], cfg: AppConfig, secrets: 
         from ..live import build_live
 
         d = dbs.get("paper") or dbs["default"]
-        live = build_live(cfg, d, Clock(), secrets, None)
-        boot = d.get_meta("engine_boot_id")
-        if not boot:
+        live = build_live(cfg, d, Clock(), secrets, None)  # usa la sessione registrata dal motore
+        if not live.boot_id:
             raise HTTPException(409, "il motore PAPER non è in esecuzione")
-        live.boot_id = boot
         return live
 
     @app.post("/api/live/arm")

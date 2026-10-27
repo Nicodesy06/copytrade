@@ -13,7 +13,8 @@ __all__ = ["CONFIRM_PHRASE", "JupiterExec", "KeyStore", "KeyStoreError", "LiveEr
            "build_live"]
 
 
-def build_live(cfg, db, clock, secrets, notifier, keystore: KeyStore | None = None, transport=None):
+def build_live(cfg, db, clock, secrets, notifier, keystore: KeyStore | None = None, transport=None,
+               engine: bool = False):
     """Costruisce l'esecutore live dalla configurazione (None se live_enabled=false)."""
     if not cfg.live_enabled:
         return None
@@ -25,4 +26,5 @@ def build_live(cfg, db, clock, secrets, notifier, keystore: KeyStore | None = No
         cfg, db, clock, keystore or KeyStore(), notifier,
         JupiterExec(pc.jupiter_url, jup_key, cfg.live.request_timeout_s, transport),
         LiveRpc(rpc_url, cfg.live.request_timeout_s, helius, transport),
+        engine=engine,
     )

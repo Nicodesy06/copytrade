@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% set title = "Controllo completo" %}
+{% block content %}
+<section class="card">
+  <p class="muted">Verifica in un colpo solo motore, agenti, database, provider gratuiti (prova reale), IA locale, trader seguiti, live, notifiche e Mac. Sola lettura: nessuna firma e nessun ordine. Se le notifiche sono attive invia una notifica di prova al telefono.</p>
+  <button type="button" class="btn ok" data-check="1">ESEGUI CONTROLLO COMPLETO</button>
+</section>
+{% if last %}
+<section class="card">
+  <div class="verdict chk-{{ last.status|lower }}">{{ last.verdict }}</div>
+  <p class="small muted">Eseguito il {{ last.at[:19].replace('T', ' ') }} UTC · OK {{ last.counts.OK }} · attenzione {{ last.counts.ATTENZIONE }} · errori {{ last.counts.ERRORE }}</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Area</th><th>Voce</th><th>Esito</th><th>Dettaglio</th><th>Cosa fare</th></tr></thead>
+    <tbody>{% for i in last['items'] %}
+      <tr><td class="small">{{ i.area }}</td><td>{{ i.name }}</td><td><strong class="chk-{{ i.status|lower }}">{{ i.status }}</strong></td><td class="small">{{ i.detail }}</td><td class="small">{{ i.fix }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+</section>
+{% else %}
+<section class="card"><p class="muted">Nessun controllo eseguito finora.</p></section>
+{% endif %}
+{% endblock %}

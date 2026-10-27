@@ -145,7 +145,7 @@ def token_account_amount(sim_acct: dict[str, Any] | None) -> int | None:
 
 class LiveExecutor:
     def __init__(self, cfg: AppConfig, db: Database, clock: Clock, keystore: KeyStore, notifier: Any,
-                 jupiter: JupiterExec, rpc: LiveRpc, boot_id: str | None = None):
+                 jupiter: JupiterExec, rpc: LiveRpc, engine: bool = False):
         self.cfg = cfg
         self.lc = cfg.live
         self.db = db
@@ -154,10 +154,15 @@ class LiveExecutor:
         self.notifier = notifier
         self.jup = jupiter
         self.rpc = rpc
-        self.boot_id = boot_id or uuid.uuid4().hex
+        # Solo il MOTORE crea e registra la propria sessione; CLI, dashboard e app agiscono su quella
+        # registrata (prima ciascuno ne creava una nuova: il motore non risultava mai armato).
+        if engine:
+            self.boot_id = uuid.uuid4().hex
+            db.set_meta("engine_boot_id", self.boot_id)
+        else:
+            self.boot_id = db.get_meta("engine_boot_id") or ""
         self.consecutive_failures = 0
         self._cap_notified_day: str | None = None
-        db.set_meta("engine_boot_id", self.boot_id)
 
     # --- stato -----------------------------------------------------------------------
     @property
@@ -170,7 +175,7 @@ class LiveExecutor:
         return self.lc.wallet_pubkey
 
     def is_armed(self) -> bool:
-        return self.enabled and self.db.get_control("live_armed", "") == self.boot_id
+        return bool(self.boot_id) and self.enabled and self.db.get_control("live_armed", "") == self.boot_id
 
     def disarm(self, reason: str, actor: str = "live") -> None:
         if self.db.get_control("live_armed", "") != "":
@@ -266,6 +271,8 @@ class LiveExecutor:
     async def arm(self, confirm: str, actor: str = "human") -> tuple[bool, str]:
         if confirm.strip().upper() != CONFIRM_PHRASE:
             return False, f'Conferma errata: digita esattamente "{CONFIRM_PHRASE}"'
+        if not self.boot_id:
+            return False, "Il motore PAPER non è in esecuzione: avvialo prima di armare il live."
         checks = await self.preflight()
         failed = [f"{n}: {d}" for n, ok, d in checks if not ok]
         if failed:

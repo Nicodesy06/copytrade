@@ -36,6 +36,8 @@ async def test_check_all_green_when_everything_runs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(hc, "check_providers", fake_providers)
     monkeypatch.setattr(hc, "check_activity", lambda db, cfg, now: [hc.CheckItem("Trader", "ok", hc.OK)])
+    # su macOS il controllo della sospensione dipende dalla macchina (caffeinate): qui lo si isola
+    monkeypatch.setattr(hc, "check_system", lambda cfg, running, path: [hc.CheckItem("Mac", "ok", hc.OK)])
     res = await hc.run_full_check(cfg, Secrets(), db, send_test_notification=False)
     assert res["status"] == "OK", [i for i in res["items"] if i["status"] != "OK"]
     assert res["verdict"].startswith("TUTTO OK")
@@ -62,3 +64,17 @@ def test_cli_check(tmp_path, monkeypatch, capsys):
     assert main(["check", "--no-notify"]) == 1  # motore spento => errore, esito chiaro
     out = capsys.readouterr().out
     assert "Motore PAPER in esecuzione" in out and "Esito:" in out and "→" in out
+
+
+def test_sleep_check_warns_on_mac_when_engine_runs_without_caffeinate(tmp_path, monkeypatch):
+    import subprocess
+    import sys
+
+    from m4desk.config import AppConfig
+
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: type("R", (), {"stdout": "nessuna asserzione"})())
+    items = {i.name: i for i in hc.check_system(AppConfig(), True, tmp_path)}
+    assert items["Sospensione per inattività bloccata"].status == hc.WARN
+    items = {i.name: i for i in hc.check_system(AppConfig(), False, tmp_path)}
+    assert items["Sospensione per inattività bloccata"].status == hc.OK  # motore spento: nessun problema

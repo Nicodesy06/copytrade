@@ -244,6 +244,17 @@ class Controller:
             live.disarm("menu dell'app", "human:app")
         return "Live disarmato: nessun nuovo acquisto reale."
 
+    def use_key_address(self) -> str:
+        from .config import set_yaml_value
+        from .live import KeyStore
+
+        pub = KeyStore().pubkey()
+        if not pub:
+            return "Nessuna chiave nel Portachiavi: importala prima."
+        set_yaml_value(Path("config.yaml"), "live.wallet_pubkey", pub)
+        self.reload_config()
+        return f"Indirizzo del wallet impostato a {pub}. Riavvia il motore, poi ripeti la verifica."
+
     def forget_key(self) -> str:
         from .config import set_yaml_value
         from .live import KeyStore
@@ -316,6 +327,8 @@ def run_menubar(ctl: Controller) -> None:
             live_menu.update([
                 rumps.MenuItem("Importa chiave wallet…", callback=self.import_key),
                 rumps.MenuItem("Verifica (preflight)", callback=lambda _: rumps.alert(APP_NAME, ctl.live_preflight())),
+                rumps.MenuItem("Usa l'indirizzo della chiave", callback=lambda _: rumps.alert(
+                    APP_NAME, ctl.use_key_address())),
                 rumps.MenuItem("ARMA LIVE…", callback=self.arm_live),
                 rumps.MenuItem("Disarma live", callback=lambda _: self.notify(ctl.live_disarm())),
                 None,

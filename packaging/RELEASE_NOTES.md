@@ -1,8 +1,14 @@
-## M4 CopyDesk 0.1.0 — app per Mac (Apple Silicon)
+## M4 CopyDesk 0.1.1 — app per Mac (Apple Silicon)
+
+### Novità della 0.1.1
+- Preflight del live più chiaro: se la chiave importata appartiene a un indirizzo diverso da
+  `live.wallet_pubkey` lo dice e indica come correggere; se mancano SOL spiega che servono per acquisti
+  e commissioni (e segnala gli USDC presenti nel wallet).
+- Nuovo comando `m4desk live use-key-address` e voce di menu "Usa l'indirizzo della chiave".
 
 Sistema locale di **ricerca** sul copy-trading Solana. Non è una promessa di rendimento.
 
-**Scarica** `M4-CopyDesk-0.1.0-macOS-arm64.dmg` qui sotto (verifica con il file `.sha256`).
+**Scarica** `M4-CopyDesk-0.1.1-macOS-arm64.dmg` qui sotto (verifica con il file `.sha256`).
 
 ### Cosa contiene
 - App nella barra dei menu ("M4") con dashboard locale in italiano su `http://127.0.0.1:8765`.

@@ -461,6 +461,15 @@ def cmd_live(args) -> int:
             set_yaml_value(cfg_path, "live.wallet_pubkey", pub)
             print("Fatto. Per abilitare il live imposta anche live_enabled: true e network: solana-mainnet.")
         return 0
+    if c == "use-key-address":
+        pub = KeyStore().pubkey()
+        if not pub:
+            raise SystemExit("Nessuna chiave nel Portachiavi: esegui prima `m4desk live import-key`.")
+        cfg_path = Path(args.config or "config.yaml")
+        if not set_yaml_value(cfg_path, "live.wallet_pubkey", pub):
+            raise SystemExit(f"Impossibile aggiornare {cfg_path}: imposta a mano live.wallet_pubkey: {pub}")
+        print(f"live.wallet_pubkey = {pub} (indirizzo della chiave importata). Riavvia il motore.")
+        return 0
     if c == "forget-key":
         KeyStore().forget()
         print("Chiave rimossa dal Portachiavi. Il live non può più firmare.")
@@ -568,6 +577,7 @@ def build_parser() -> argparse.ArgumentParser:
     lsub = sp.add_subparsers(dest="live_cmd", required=True)
     lsub.add_parser("import-key", help="importa la chiave privata nel Portachiavi (input nascosto)")
     lsub.add_parser("forget-key", help="rimuove la chiave dal Portachiavi")
+    lsub.add_parser("use-key-address", help="imposta live.wallet_pubkey all'indirizzo della chiave importata")
     lsub.add_parser("status", help="stato del live e ultimi ordini reali")
     lsub.add_parser("preflight", help="controlli completi + prova di swap SIMULATA (nessuna firma)")
     la = lsub.add_parser("arm", help='arma il live nel motore in esecuzione (richiede "ARMA LIVE")')

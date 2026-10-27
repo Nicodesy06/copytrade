@@ -425,3 +425,29 @@ def test_cli_import_key_never_echoes_secret(tmp_path, monkeypatch, capsys):
     assert load_config(tmp_path / "config.yaml").live.wallet_pubkey == str(kp.pubkey())
     assert secret not in (tmp_path / "config.yaml").read_text() and secret not in (tmp_path / ".env").read_text()
     assert "NTFY_TOPIC=m4desk-" in (tmp_path / ".env").read_text()
+
+
+async def test_preflight_explains_mismatch_and_missing_sol(tmp_path):
+    live, chain, kp, db = make_live(tmp_path)
+    other = Keypair()
+    live.keys.store(_b58encode(bytes(other)))
+    chain.balance = 0
+    res = {n: d for n, ok, d in await live.preflight(dry_run_swap=False)}
+    assert str(other.pubkey()) in res["La chiave corrisponde a live.wallet_pubkey"]
+    assert "use-key-address" in res["La chiave corrisponde a live.wallet_pubkey"]
+    assert "commissioni in SOL" in res["Saldo SOL sufficiente"]
+
+
+def test_cli_use_key_address(tmp_path, monkeypatch, capsys):
+    from m4desk import cli
+    from m4desk.config import load_config
+    from m4desk.live import keystore
+
+    monkeypatch.chdir(tmp_path)
+    mem = MemoryBackend()
+    monkeypatch.setattr(keystore, "default_backend", lambda: mem)
+    assert cli.main(["init"]) == 0
+    kp = Keypair()
+    KeyStore(mem).store(_b58encode(bytes(kp)))
+    assert cli.main(["live", "use-key-address"]) == 0
+    assert load_config(tmp_path / "config.yaml").live.wallet_pubkey == str(kp.pubkey())

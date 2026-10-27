@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from ..clock import Clock
 from ..config import AppConfig
 from ..storage.db import Database, LiveOrder, LivePosition, Order
-from ..types import LAMPORTS_PER_SOL, SOL_MINT, SystemState
+from ..types import LAMPORTS_PER_SOL, SOL_MINT, USDC_MINT, SystemState
 from .keystore import KeyStore, KeyStoreError
 from .txcheck import check_simulation, inspect_transaction
 
@@ -215,8 +215,13 @@ class LiveExecutor:
         except Exception as e:
             out.append(("Chiave leggibile dal Portachiavi", False, type(e).__name__))
         out.append(("Chiave importata", pub is not None, "m4desk live import-key"))
-        out.append(("La chiave corrisponde a live.wallet_pubkey", pub is not None and pub == self.lc.wallet_pubkey,
-                    f"chiave {pub or '-'} / atteso {self.lc.wallet_pubkey or '-'}"))
+        match = pub is not None and pub == self.lc.wallet_pubkey
+        detail = f"chiave {pub or '-'} / atteso {self.lc.wallet_pubkey or '-'}"
+        if pub and not match:
+            detail += (f". La chiave importata appartiene a {pub}: se è il tuo wallet (es. quello di Fomo) usa "
+                       "`m4desk live use-key-address` o il menu Live → \"Usa l'indirizzo della chiave\"; "
+                       "altrimenti importa la chiave giusta.")
+        out.append(("La chiave corrisponde a live.wallet_pubkey", match, detail))
         state = self.db.get_control("state", "RUNNING")
         out.append(("Sistema in stato RUNNING", state == SystemState.RUNNING.value, state))
         if not self.lc.wallet_pubkey:
@@ -224,8 +229,18 @@ class LiveExecutor:
         try:
             bal = await self.rpc.balance(self.owner)
             need = int((self.lc.min_sol_reserve + self.lc.max_sol_per_trade) * LAMPORTS_PER_SOL) + FEE_RESERVE_LAMPORTS
-            out.append(("Saldo SOL sufficiente", bal >= need, f"{bal / LAMPORTS_PER_SOL:.4f} SOL (minimo "
-                        f"{need / LAMPORTS_PER_SOL:.4f})"))
+            detail = f"{bal / LAMPORTS_PER_SOL:.4f} SOL (minimo {need / LAMPORTS_PER_SOL:.4f})"
+            if bal < need:
+                usdc = 0
+                try:
+                    usdc, _ = await self.rpc.token_holdings(self.owner, USDC_MINT)
+                except LiveError:
+                    pass
+                detail += (". Il bot compra con SOL e ogni transazione Solana paga le commissioni in SOL: "
+                           f"trasferisci almeno {(need - bal) / LAMPORTS_PER_SOL:.4f} SOL su {self.owner}")
+                if usdc:
+                    detail += f" (il wallet ha {usdc / 1e6:.2f} USDC: puoi convertirne una parte in SOL da Fomo)"
+            out.append(("Saldo SOL sufficiente", bal >= need, detail))
         except LiveError as e:
             out.append(("Saldo SOL leggibile via RPC", False, e.reason))
         if dry_run_swap:
@@ -235,8 +250,10 @@ class LiveExecutor:
                                          self.lc.exclude_routers)
                 tx = o.get("transaction") or ""
                 rep = inspect_transaction(tx, self.owner, amount, self.lc.max_priority_fee_lamports) if tx else None
-                out.append(("Jupiter: transazione ricevuta e ispezionata", bool(rep and rep.ok),
-                            "; ".join(rep.violations) if rep else str(o.get("errorMessage", "nessuna transazione"))))
+                why = "; ".join(rep.violations) if rep else str(o.get("errorMessage", "nessuna transazione"))
+                if not tx and o.get("errorCode") in (1, 2):
+                    why += " — servono SOL sul wallet per lo swap di prova (0,001 SOL) e le commissioni"
+                out.append(("Jupiter: transazione ricevuta e ispezionata", bool(rep and rep.ok), why))
                 if rep and rep.ok:
                     pre = await self.rpc.balance(self.owner)
                     sim = await self.rpc.simulate(tx, [self.owner])

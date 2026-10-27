@@ -179,3 +179,25 @@ async def test_audit_records_every_decision(tmp_path):
         types = {e.type for e in s.scalars(select(EventRow))}
     assert d.facts["provenance"]["origin"] == "SIMULATO / DATI DI ESEMPIO" and d.facts["signature"]
     assert {"LEADER_SWAP", "TOKEN_ASSESSED", "DECISION", "ORDER_UPDATE"} <= types
+
+
+async def test_events_during_stop_are_deferred_not_lost(tmp_path):
+    rt, world, sup = await engine(tmp_path, scenario([token("ST", 0.01)]))
+    follow(rt)
+    rt.db.set_control("state", SystemState.STOPPED.value, "human", "test")
+    await feed(rt, world, swap(LEADER, mint("ST"), "BUY", S, 2000, 0.01, 0, 10**11))
+    from m4desk.storage.db import ConsumerCheckpoint, EventRow
+
+    with rt.db.session() as s:
+        ev = s.scalars(select(EventRow).where(EventRow.type == "LEADER_SWAP")).one()
+        done = s.get(ConsumerCheckpoint, ("position_manager", ev.event_id))
+    assert done is None  # non confermato => riconsegnato al riavvio
+    await rt.bus.stop()
+    rt.db.set_control("state", SystemState.RUNNING.value, "human", "test")
+    rt.bus.start()
+    assert await rt.bus.redeliver_pending() >= 1
+    await rt.bus.wait_idle()
+    from m4desk.storage.db import DecisionRow
+
+    with rt.db.session() as s:
+        assert s.scalars(select(DecisionRow)).first() is not None

@@ -19,6 +19,10 @@ log = logging.getLogger(__name__)
 Handler = Callable[[EventEnvelope], Awaitable[None]]
 
 
+class DeferEvent(Exception):  # noqa: N818
+    """L'handler rinvia l'evento: resta non confermato e viene riconsegnato al riavvio."""
+
+
 @dataclass
 class Subscription:
     name: str
@@ -107,6 +111,8 @@ class EventBus:
                 await sub.handler(env)
                 self._mark_done(sub.name, env.event_id)
                 sub.processed += 1
+            except DeferEvent:
+                pass
             except Exception as e:  # l'evento resta non confermato e verrà riconsegnato al riavvio
                 sub.errors += 1
                 sub.last_error = f"{type(e).__name__}: {e}"[:300]

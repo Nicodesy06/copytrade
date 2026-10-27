@@ -36,6 +36,23 @@ class DiscoveryAgent(Agent):
         )
         return True
 
+    def unscored(self, wallets: list[str]) -> list[str]:
+        from sqlalchemy import select
+
+        from ..storage.db import TraderScore
+
+        with self.rt.db.session() as s:
+            scored = set(s.scalars(select(TraderScore.wallet).distinct()))
+        return [w for w in wallets if w not in scored]
+
+    async def _announce_unscored(self, wallets: list[str]) -> None:
+        """Wallet aggiunti a mano (CLI) o mai valutati: vengono proposti all'analisi."""
+        now = self.rt.clock.now()
+        for w in self.unscored(wallets):
+            await self.rt.bus.publish(make_event(
+                EventType.WALLET_CANDIDATE, self.name, (w, "unscored", now.isoformat()), self.rt.origin,
+                self.rt.providers.chain.name, now, wallet=w, payload={"source": "watchlist", "via": None}))
+
     async def cycle(self) -> dict[str, int]:
         cfg = self.rt.cfg.discovery
         f = self.funnel()
@@ -45,6 +62,7 @@ class DiscoveryAgent(Agent):
                 f["seed"] += 1
                 f["candidates"] += 1
         known = [w.address for w in self.rt.db.list_wallets()]
+        await self._announce_unscored(known)
         tokens: list[str] = []
         try:
             for w in known[: cfg.max_candidates]:

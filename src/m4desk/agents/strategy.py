@@ -21,6 +21,7 @@ class StrategyAgent(Agent):
 
     def __init__(self, rt):
         super().__init__(rt)
+        self._last_empty: dict[str, int] = {}
         self.rescore = None  # callback: ricalcolo punteggi con dati fino ad ora (niente look-ahead)
         rt.bus.subscribe(self.name, {EventType.POSITION_CLOSED}, self.handle)
 
@@ -86,7 +87,8 @@ class StrategyAgent(Agent):
                                      note=ai_note))
             selected += new
             out[sid] = selected
-            if free > 0 and not new:
+            if free > 0 and not new and self._last_empty.get(sid) != free:  # niente spam a ogni ciclo
+                self._last_empty[sid] = free
                 self.rt.db.audit(self.name, "selection.empty",
                                  f"[{sid}] {ReasonCode.NO_REPLACEMENT_CANDIDATE.value}: nessun candidato idoneo, "
                                  f"slot liberi {free}", {"strategy": sid}, "WARN", ts=now)

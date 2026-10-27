@@ -48,6 +48,7 @@ class PaperBroker:
         self.risk = risk
         self.clock = clock
         self.sleep = sleeper
+        self.last_quote_latency_s: float | None = None
 
     # --- fase 1 ----------------------------------------------------------
     def _create_pending(self, **kw) -> tuple[Order, bool]:
@@ -134,7 +135,9 @@ class PaperBroker:
         try:
             sol_px, _ = await self._sol_price()
             lamports = int((size_usd / sol_px * LAMPORTS_PER_SOL).to_integral_value(rounding=ROUND_DOWN))
+            t_req = self.clock.now()
             q = await self.quotes.quote(SOL_MINT, mint, lamports)
+            self.last_quote_latency_s = (q.quoted_at - t_req).total_seconds()
             mkt = await self.market.get_market(mint)
         except ProviderError as e:
             return self._finish(order.id, OrderState.FAILED, e.reason, detail={"error": str(e)})

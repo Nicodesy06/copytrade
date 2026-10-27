@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..providers.base import MarketSnapshot, ProviderError
 from ..runtime import day_start_equity
-from ..services.events import make_event
+from ..services.events import DeferEvent, make_event
 from ..services.risk import BuyContext
 from ..storage.db import DecisionRow, EventRow, Order, Position
 from ..types import (
@@ -53,7 +53,7 @@ class PositionManagerAgent(Agent):
         self.beat("RUNNING", env.type.value)
         if self.rt.system_state() == SystemState.STOPPED:
             self.beat("STOPPED", "sistema arrestato")
-            return
+            raise DeferEvent()  # non confermato: verrà riconsegnato al riavvio (nessuna vendita persa)
         if env.type == EventType.LEADER_SWAP:
             swap = SwapObservation.model_validate(env.payload["swap"])
             lag = (env.observed_at - env.event_at).total_seconds()
@@ -199,9 +199,9 @@ class PositionManagerAgent(Agent):
                 )
             finally:
                 self.rt.reservations.release(sid, swap.mint)
-            if o.quote_at is not None and o.filled_at is not None:
-                if self.rt.quote_breaker.observe((o.filled_at - o.quote_at).total_seconds()):
-                    self._breaker_audit(self.rt.quote_breaker, (o.filled_at - o.quote_at).total_seconds())
+            lag = self.rt.broker.last_quote_latency_s
+            if lag is not None and self.rt.quote_breaker.observe(lag):
+                self._breaker_audit(self.rt.quote_breaker, lag)
             await self._publish_order(o)
             await self._after_fill_checks(sid)
 

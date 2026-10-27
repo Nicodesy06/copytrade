@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
@@ -50,6 +51,7 @@ class ProviderGate:
         self._lock = asyncio.Lock()
         self.last_error: str | None = None
         self.last_ok_at: datetime | None = None
+        self._last_call_mono: float | None = None
 
     # --- stato -------------------------------------------------------------
     def usage(self) -> dict[str, int]:
@@ -140,10 +142,21 @@ class ProviderGate:
             assert reason is not None
             raise ProviderError(self.name, reason, self.disabled_reason or "")
         async with self._lock:
-            while self._minute and (now - self._minute[0]).total_seconds() > 60:
-                self._minute.popleft()
-            if len(self._minute) >= self.budget.per_minute:
-                raise ProviderError(self.name, ReasonCode.PROVIDER_RATE_LIMITED, "limite locale per minuto")
+            while True:
+                now = self.clock.now()
+                while self._minute and (now - self._minute[0]).total_seconds() > 60:
+                    self._minute.popleft()
+                if len(self._minute) < self.budget.per_minute:
+                    break
+                if self.clock.simulated:
+                    raise ProviderError(self.name, ReasonCode.PROVIDER_RATE_LIMITED, "limite locale per minuto")
+                # limitatore locale: si attende (throttling) invece di fallire
+                await asyncio.sleep(max(0.1, 60.5 - (now - self._minute[0]).total_seconds()))
+            if self.budget.min_interval_s and self._last_call_mono is not None and not self.clock.simulated:
+                wait = self.budget.min_interval_s - (time.monotonic() - self._last_call_mono)
+                if wait > 0:
+                    await asyncio.sleep(wait)
+            self._last_call_mono = time.monotonic()
             self._minute.append(now)
         self._bump(requests=1)
         try:

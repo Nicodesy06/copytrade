@@ -182,7 +182,16 @@ async def run_paper(rt: Runtime, sup: Supervisor) -> None:
     gap = GapFiller(rt)
 
     async def discovery() -> None:
-        await sup.discovery.cycle()
+        await sup.discovery.cycle()  # i nuovi candidati vengono valutati dal TraderAnalyst via evento
+        await rt.bus.wait_idle()
+        await sup.strategy.selection_round()
+        # se qualche wallet non è ancora valutato (429/budget) si riprova presto: la cache delle
+        # transazioni già scaricate fa avanzare ogni tentativo senza ripetere le richieste
+        pending = sup.discovery.unscored([w.address for w in rt.db.list_wallets()])
+        await asyncio.sleep(120 if pending else cfg.discovery.interval_s)
+
+    async def rescore() -> None:
+        await asyncio.sleep(cfg.trader.rescore_interval_s)
         await sup.rescore_candidates()
         await sup.strategy.selection_round()
 
@@ -207,7 +216,8 @@ async def run_paper(rt: Runtime, sup: Supervisor) -> None:
                                             rt.clock.now(), payload={"day": last}))
         rt.db.set_checkpoint("last_report_day", day)
 
-    sup.supervise("discovery", discovery, cfg.discovery.interval_s)
+    sup.supervise("discovery", discovery, 1)
+    sup.supervise("rescore", rescore, 1)
     sup.supervise("ingest", ingest, cfg.providers.poll_interval_s)
     sup.supervise("prices", prices, cfg.providers.price_refresh_s)
     sup.supervise("audit", audit, 60)

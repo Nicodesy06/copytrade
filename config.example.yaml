@@ -64,6 +64,7 @@ trader:
   min_median_hold_s: 120          # trader troppo veloci non sono copiabili con ritardo
   max_history_tx: 100
   lookback_days: 30
+  rescore_interval_s: 21600       # ricalcolo punteggi ogni 6 ore (ogni wallet costa ~1+N richieste RPC)
 
 strategy:
   primary: switch2
@@ -89,10 +90,11 @@ providers:
   poll_interval_s: 20
   price_refresh_s: 30
   budget:                         # limiti locali prudenti; a esaurimento si fermano scoperta e acquisti
-    rpc: {daily_requests: 20000, monthly_requests: 300000, per_minute: 60}
-    dexscreener: {daily_requests: 10000, monthly_requests: 250000, per_minute: 50}
-    jupiter: {daily_requests: 3000, monthly_requests: 60000, per_minute: 30}
-    rugcheck: {daily_requests: 1000, monthly_requests: 20000, per_minute: 10}
+    # min_interval_s: spaziatura minima fra due chiamate (l'RPC pubblico risponde 429 a raffiche)
+    rpc: {daily_requests: 20000, monthly_requests: 300000, per_minute: 20, min_interval_s: 2.5}
+    dexscreener: {daily_requests: 10000, monthly_requests: 250000, per_minute: 50, min_interval_s: 0.3}
+    jupiter: {daily_requests: 3000, monthly_requests: 60000, per_minute: 30, min_interval_s: 1.0}
+    rugcheck: {daily_requests: 1000, monthly_requests: 20000, per_minute: 10, min_interval_s: 2.0}
 
 llm:
   enabled: true                   # se Ollama non risponde si usa la baseline deterministica

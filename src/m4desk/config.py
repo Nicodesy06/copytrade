@@ -83,6 +83,7 @@ class TraderConfig(_Strict):
     min_median_hold_s: int = 120
     max_history_tx: int = 100
     lookback_days: int = 30
+    rescore_interval_s: int = 21600  # ricalcolo periodico dei punteggi in PAPER (costa richieste RPC)
 
 
 class StrategyConfig(_Strict):
@@ -101,6 +102,7 @@ class BudgetConfig(_Strict):
     daily_requests: int
     monthly_requests: int
     per_minute: int
+    min_interval_s: float = 0.0  # spaziatura minima fra chiamate (evita 429 sui piani gratuiti)
 
 
 class ProvidersConfig(_Strict):
@@ -117,10 +119,10 @@ class ProvidersConfig(_Strict):
     poll_interval_s: int = 20
     price_refresh_s: int = 30
     budget: dict[str, BudgetConfig] = {
-        "rpc": BudgetConfig(daily_requests=20000, monthly_requests=300000, per_minute=60),
-        "dexscreener": BudgetConfig(daily_requests=10000, monthly_requests=250000, per_minute=50),
-        "jupiter": BudgetConfig(daily_requests=3000, monthly_requests=60000, per_minute=30),
-        "rugcheck": BudgetConfig(daily_requests=1000, monthly_requests=20000, per_minute=10),
+        "rpc": BudgetConfig(daily_requests=20000, monthly_requests=300000, per_minute=20, min_interval_s=2.5),
+        "dexscreener": BudgetConfig(daily_requests=10000, monthly_requests=250000, per_minute=50, min_interval_s=0.3),
+        "jupiter": BudgetConfig(daily_requests=3000, monthly_requests=60000, per_minute=30, min_interval_s=1.0),
+        "rugcheck": BudgetConfig(daily_requests=1000, monthly_requests=20000, per_minute=10, min_interval_s=2.0),
     }
 
 

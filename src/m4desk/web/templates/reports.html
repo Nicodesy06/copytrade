@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% set title = "Report" %}
+{% block content %}
+<section class="grid-side">
+  <div class="card"><h2>Report giornalieri</h2>
+    <ul class="list">{% for r in reports %}<li><a href="?id={{ r.id }}" {% if cur and cur.id == r.id %}aria-current="true"{% endif %}>{{ r.day }}</a> <span class="small muted">{{ r.created_at.strftime('%d/%m %H:%M') }}</span></li>{% else %}<li class="muted">Nessun report.</li>{% endfor %}</ul>
+  </div>
+  <article class="card report">{{ html|safe }}</article>
+</section>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% set title = "Rischi" %}
+{% block content %}
+<section class="grid2">
+  <div class="card">
+    <h2>Limiti attivi (deterministici, prioritari sull'AI)</h2>
+    <dl class="facts two">
+      <dt>Capitale virtuale iniziale</dt><dd>{{ risk.starting_equity_usd|usd }}</dd>
+      <dt>Leader massimi / posizioni massime</dt><dd>{{ risk.max_leaders }} / {{ risk.max_positions }}</dd>
+      <dt>Max per posizione / esposizione lorda</dt><dd>{{ risk.max_position_pct|pct(0) }} / {{ risk.max_gross_exposure_pct|pct(0) }} dell'equity</dd>
+      <dt>Quota per leader (libro a frazione fissa)</dt><dd>{{ (risk.leader_book_fraction|pct(1)) if risk.leader_book_fraction else '1/' ~ risk.max_leaders }} dell'esposizione massima</dd>
+      <dt>Perdita giornaliera massima</dt><dd>{{ risk.max_daily_loss_pct|pct(0) }}</dd>
+      <dt>Max chase (ipotesi di test)</dt><dd>{{ risk.max_chase_pct }}% sopra il fill osservato del leader</dd>
+      <dt>Liquidità minima / impatto max</dt><dd>{{ risk.min_liquidity_usd|usd(0) }} / {{ risk.max_price_impact_pct }}%</dd>
+      <dt>Età minima token / prezzo max età</dt><dd>{{ risk.min_token_age_minutes }} min / {{ risk.max_price_age_s }} s</dd>
+      <dt>Stop-loss / take-profit simulati</dt><dd>−{{ risk.stop_loss_pct|pct(0) }} / +{{ risk.take_profit_pct|pct(0) }} (eseguiti al prezzo osservato dopo il ritardo)</dd>
+      <dt>Perdite consecutive per blocco leader</dt><dd>{{ risk.consecutive_loss_limit }}</dd>
+      <dt>Breaker ritardo feed / quotazioni</dt><dd>{{ risk.feed_lag_max_s }} s / {{ risk.quote_lag_max_s }} s ({{ risk.breaker_trip_count }} misure)</dd>
+      <dt>Ritardo di esecuzione simulato</dt><dd>{{ sim.fill_delay_s }} s + slippage {{ sim.extra_slippage_bps }} bps</dd>
+    </dl>
+    <p class="small muted">Ipotesi iniziali prudenti: nessuna soglia garantisce la sicurezza.</p>
+  </div>
+  <div class="card">
+    <h2>Stato dei controlli</h2>
+    <h3>Invarianti contabili</h3>
+    <ul class="list">{% for sid, v in contracts.items() %}<li>{{ sid }}: {% if v %}<span class="tag skip">VIOLATI</span> {{ v|join('; ') }}{% else %}<span class="tag copy">OK</span>{% endif %}</li>{% endfor %}</ul>
+    <h3>Drawdown giornaliero</h3>
+    <ul class="list">{% for sid, d in dd.items() %}<li>{{ sid }}: {{ d|num if d is not none else 'n/d' }}% (limite {{ (risk.max_daily_loss_pct*100)|num(0) }}%)</li>{% endfor %}</ul>
+    <h3>Leader bloccati</h3>
+    <ul class="list">{% for b in blocked %}<li>{{ b.strategy }}: {{ labels.get(b.wallet) or b.wallet|short }} — {{ b.note }}</li>{% else %}<li class="muted">Nessuno.</li>{% endfor %}</ul>
+    <h3>Breaker di ritardo</h3>
+    <ul class="list">{% for k, b in breakers.items() %}<li>{{ k[8:] }}: {% if b.open %}<span class="tag skip">APERTO</span>{% else %}<span class="tag copy">CHIUSO</span>{% endif %} <span class="small muted">ultimo ritardo {{ b.lag_s|num(1) }} s</span></li>{% else %}<li class="muted">Feed e quotazioni: nessun breaker scattato.</li>{% endfor %}</ul>
+    <h3>Prenotazioni di posizione in volo</h3>
+    <p>{{ reservations|length }}</p>
+  </div>
+</section>
+<section class="grid2">
+  <div class="card"><h2>Motivi di rifiuto (tutte le strategie)</h2>
+    <ul class="bars">{% set mx = (skip[0][1] if skip else 1) %}{% for code, n in skip %}<li><span>{{ code|reason }}</span><span class="bar" style="--w: {{ (n / mx * 100)|round(0) }}%"></span><strong>{{ n }}</strong></li>{% else %}<li class="muted">Nessun rifiuto.</li>{% endfor %}</ul>
+  </div>
+  <div class="card"><h2>Eventi di rischio</h2>
+    <ul class="list">{% for e in events %}<li class="small"><span class="tag lvl-{{ e.level|lower }}">{{ e.level }}</span> {{ e.ts.strftime('%d/%m %H:%M') }} · {{ e.message }}</li>{% else %}<li class="muted small">Nessun evento.</li>{% endfor %}</ul>
+  </div>
+</section>
+{% endblock %}

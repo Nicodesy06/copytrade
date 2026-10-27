@@ -1,0 +1,5 @@
+# Un indirizzo PUBBLICO Solana per riga (mai chiavi private o seed phrase).
+# Esempio d'uso:  grep -v '^#' examples/watchlist_example.txt | xargs -n1 m4desk wallets add
+# Indirizzo pubblico di un trader osservato in una transazione Jupiter pubblica (solo a scopo di test,
+# NON è un consiglio né una prova di profittabilità):
+95DzCuFk7vU4fJycnFBpUBXqUyxSR8avuSRgVDVtKjmW

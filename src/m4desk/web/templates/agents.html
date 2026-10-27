@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% set title = "Agenti" %}
+{% block content %}
+<section class="card">
+  <p class="muted">Agenti logici concorrenti che comunicano con envelope immutabili. Un solo modello LLM locale condiviso (coda limitata), usato solo dallo StrategyAgent in modo consultivo. Backend LLM: <strong>{{ llm_backend }}</strong>.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Agente</th><th>Ruolo</th><th>Stato</th><th>Heartbeat</th><th class="r">Elaborati</th><th class="r">Errori</th><th class="r">Riavvii</th><th class="r">Coda</th><th>Dettaglio</th></tr></thead>
+    <tbody>
+    {% for a in agents %}
+    <tr><td><strong>{{ a.name }}</strong></td><td class="small">{{ desc.get(a.name, '') }}</td><td><span class="tag st-{{ a.status|lower }}">{{ a.status }}</span></td><td class="small">{{ a.heartbeat_at.strftime('%d/%m %H:%M:%S') }}</td><td class="r">{{ a.processed }}</td><td class="r">{{ a.errors }}</td><td class="r">{{ a.restarts }}</td><td class="r">{{ a.queue_depth }}</td><td class="small muted">{{ a.detail or '' }}{% if a.last_error %}<br><span class="neg">{{ a.last_error }}</span>{% endif %}</td></tr>
+    {% else %}<tr><td colspan="9" class="muted">Nessun agente avviato. Esegui <code>m4desk demo</code> o <code>m4desk run --mode paper</code>.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <p class="small muted">Gli heartbeat in DEMO usano l'ora reale di esecuzione; i dati usano l'orologio simulato.</p>
+</section>
+{% endblock %}

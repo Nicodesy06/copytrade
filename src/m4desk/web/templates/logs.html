@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% set title = "Log" %}
+{% block content %}
+<nav class="tabs" aria-label="Livello">{% for l in ['', 'INFO', 'WARN', 'ERROR'] %}<a href="?level={{ l }}" class="{{ 'active' if level == l else '' }}">{{ l or 'Tutti' }}</a>{% endfor %}</nav>
+<section class="card">
+  <p class="small muted">Audit log: ogni decisione, azione esterna e comando umano è registrato. Nessun segreto viene mai scritto nei log.</p>
+  <div class="tablewrap"><table class="compact">
+    <thead><tr><th>Ora</th><th>Livello</th><th>Attore</th><th>Azione</th><th>Messaggio</th></tr></thead>
+    <tbody>{% for r in rows %}<tr><td class="small">{{ r.ts.strftime('%d/%m %H:%M:%S') }}</td><td><span class="tag lvl-{{ r.level|lower }}">{{ r.level }}</span></td><td class="small">{{ r.actor }}</td><td class="small"><code>{{ r.action }}</code></td><td class="small">{{ r.message }}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">Vuoto.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

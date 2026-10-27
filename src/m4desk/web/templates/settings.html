@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% set title = "Impostazioni" %}
+{% block content %}
+<section class="grid2">
+  <div class="card">
+    <h2>Modalità</h2>
+    <dl class="facts two">
+      <dt>Modalità</dt><dd><strong>{{ mode|upper }}</strong></dd>
+      <dt>Origine dati</dt><dd>{{ origin }}</dd>
+      <dt>Rete</dt><dd>{{ cfg.network }}</dd>
+      <dt>Esecuzione reale (live)</dt><dd><span class="tag skip">DISABILITATO</span> <span class="tag skip">NON IMPLEMENTATO</span></dd>
+      <dt>Firma transazioni</dt><dd><span class="tag skip">DISABILITATO</span> (nessuna chiave nel sistema)</dd>
+      <dt>Versione strategia</dt><dd><code>{{ version }}</code></dd>
+      <dt>RPC</dt><dd>{{ rpc }}</dd>
+      <dt>LLM</dt><dd>{{ llm_backend }} · {{ cfg.llm.base_url }} · concorrenza {{ cfg.llm.max_concurrency }} · coda {{ cfg.llm.max_queue }}</dd>
+      {% if fixture %}<dt>Fixture</dt><dd>{{ fixture.name }} ({{ fixture.label }})</dd>{% endif %}
+    </dl>
+    <p class="small muted">Le impostazioni si modificano in <code>config.yaml</code> (non dalla dashboard). Ogni modifica delle soglie crea una nuova versione di strategia: i risultati non vengono riscritti retroattivamente.</p>
+  </div>
+  <div class="card">
+    <h2>Budget provider gratuiti</h2>
+    <div class="tablewrap"><table class="compact"><thead><tr><th>Provider</th><th class="r">Giorno</th><th class="r">Mese</th><th class="r">Minuto</th></tr></thead>
+    <tbody>{% for n, b in cfg.providers.budget.items() %}<tr><td>{{ n }}</td><td class="r">{{ b.daily_requests }}</td><td class="r">{{ b.monthly_requests }}</td><td class="r">{{ b.per_minute }}</td></tr>{% endfor %}</tbody></table></div>
+    <p class="small muted">Nessun abbonamento, nessun upgrade automatico. A budget esaurito si fermano scoperta e nuovi acquisti.</p>
+  </div>
+</section>
+<section class="card"><h2>Strategie</h2><ul class="list">{% for k, v in strategies.items() %}<li><code>{{ k }}</code> — {{ v }}{% if k == primary %} <span class="tag copy">primaria</span>{% endif %}</li>{% endfor %}</ul></section>
+<section class="card"><h2>Configurazione pubblica (nessun segreto)</h2><details data-key="cfg"><summary>mostra</summary><pre class="small">{{ public|tojson(indent=2) }}</pre></details></section>
+{% endblock %}

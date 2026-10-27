@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% set title = "Trader" %}
+{% block content %}
+<section class="card">
+  <h2>Leader per strategia</h2>
+  <div class="grid3">
+  {% for sid, slots in leaders.items() %}
+    <div class="sub-card"><h3>{{ strategies.get(sid, sid) }}</h3>
+      <ul class="list">{% for s in slots %}<li><span class="tag ls-{{ s.status|lower }}">{{ {'SELECTED':'SEGUITO','BLOCKED':'BLOCCATO','MANAGE_ONLY':'SOLO GESTIONE'}[s.status] }}</span> {{ labels.get(s.wallet) or s.wallet|short }} <span class="small muted">perdite consecutive {{ s.consecutive_losses }}</span>{% if s.note %}<br><span class="small muted">{{ s.note }}</span>{% endif %}</li>{% endfor %}</ul>
+    </div>
+  {% else %}<p class="muted">Nessun leader selezionato.</p>{% endfor %}
+  </div>
+</section>
+<section class="card">
+  <h2>Watchlist e metriche</h2>
+  <p class="small muted">Metriche ricostruite solo da swap pubblici osservati fino all'istante del calcolo (nessun dato futuro). "n/d" = dato insufficiente. Campioni piccoli e survivorship bias: un punteggio alto non indica rendimenti futuri. Proxy di affollamento: NON DISPONIBILE (nessuna fonte gratuita verificabile).</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Wallet</th><th>Fonte</th><th>Esito</th><th class="r">Punteggio</th><th class="r">Round-trip</th><th class="r">Win rate (IC95%)</th><th class="r">Rend. mediano</th><th class="r">Profit factor</th><th class="r">Hold mediano</th><th class="r">Concentr.</th><th class="r">Copiabilità</th><th class="r">Completezza</th><th class="r">7g vs 30g</th></tr></thead>
+    <tbody>
+    {% for w in wallets %}{% set sc = scores.get(w.address) %}{% set m = sc.metrics if sc else {} %}
+    <tr><td><span title="{{ w.address }}">{{ w.label or w.address|short }}</span><br><code class="small">{{ w.address|short(8) }}</code></td><td class="small">{{ w.source }}{% if w.discovered_via %}<br><span class="muted">{{ w.discovered_via|short }}</span>{% endif %}</td>
+      <td>{% if sc %}<span class="tag sc-{{ sc.status|lower }}">{{ {'ELIGIBLE':'IDONEO','BELOW_THRESHOLD':'SOTTO SOGLIA','INSUFFICIENT_DATA':'DATI INSUFFICIENTI'}.get(sc.status, sc.status) }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="r">{{ sc.score|num(3) if sc else 'n/d' }}</td><td class="r">{{ m.get('round_trips', 'n/d') }}</td>
+      <td class="r">{{ m.get('win_rate')|pct(0) }}{% if m.get('win_rate_ci95') and m.get('win_rate_ci95')[0] is not none %} <span class="small muted">({{ m.win_rate_ci95[0]|pct(0) }}–{{ m.win_rate_ci95[1]|pct(0) }})</span>{% endif %}</td>
+      <td class="r">{{ m.get('median_return')|pct }}</td><td class="r">{{ m.get('profit_factor')|num }}</td><td class="r">{{ ((m.get('hold_median_s') or 0)/60)|num(0) if m.get('hold_median_s') is not none else 'n/d' }} min</td>
+      <td class="r">{{ m.get('top_token_share')|pct(0) }}</td><td class="r">{{ m.get('copiability')|pct(0) }}</td><td class="r">{{ m.get('data_completeness')|pct(0) }}</td><td class="r small">{{ m.get('momentum_7d_mean')|pct }} / {{ m.get('momentum_30d_mean')|pct }}</td></tr>
+    {% else %}<tr><td colspan="13" class="muted">Nessun wallet: <code>m4desk wallets add &lt;INDIRIZZO_PUBBLICO&gt;</code></td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

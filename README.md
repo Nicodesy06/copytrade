@@ -21,6 +21,14 @@ nessuna transazione reale, nessuna chiave di wallet, P&L su capitale **virtuale*
 - **Dashboard italiana** (chiaro/scuro, aggiornamento in tempo reale) con PAUSA / RIPRENDI / ARRESTA.
 - **Report giornalieri** in italiano, audit log completo, registro FMEA con test bloccanti.
 
+## Schermate (demo, dati sintetici)
+
+| Panoramica | Operazioni |
+|---|---|
+| ![Panoramica](docs/img/panoramica.png) | ![Operazioni](docs/img/operazioni.png) |
+| **Token** | **Trader (tema scuro)** |
+| ![Token](docs/img/token.png) | ![Trader](docs/img/trader-scuro.png) |
+
 ## Installazione (macOS, zsh)
 
 ```zsh

@@ -31,8 +31,22 @@ API proprietarie di bot, endpoint Jupiter deprecati, qualsiasi LLM remoto.
 - [x] **F6** Dashboard italiana (FastAPI + Jinja, nessun CDN), azioni PAUSA/RIPRENDI/ARRESTA protette e auditate.
 - [x] **F7** CLI `m4desk` completa, `launchd`, documentazione, test.
 - [x] **F8** Adapter reali (RPC, DEX Screener, Jupiter, Rugcheck) con budget, cache, backoff, circuit breaker; modalità PAPER mainnet read-only.
+  Verificato dal vivo il 2026-10-27: `m4desk test-providers` tutto OK; percorso controllo token reale →
+  quotazione Jupiter ritardata → fill virtuale riuscito (BONK, 50 $, impatto 0,087%, slippage 55 bps,
+  ritardo 7 s, 6 richieste totali). L'RPC pubblico da IP cloud condiviso risponde `429` dopo poche
+  richieste: il sistema resta fail-closed e riprova ogni 2 minuti; per uso continuativo serve Helius free.
 - [ ] **F9 (futuro)** Ricostruzione storica estesa con finestre hold-out su dati reali (richiede raccolta forward-paper).
 - [ ] **F10 (futuro, opzionale)** Modulo live isolato: **non implementato**, vedi `docs/LIVE_CHECKLIST.md`.
+
+## Addendum sicurezza (04_ADDENDUM_SAFETY_FMEA_E_RISK_ENGINE.md)
+
+Il file dell'addendum **non era presente** nel repository al momento dello sviluppo. Sono stati
+implementati i controlli elencati nel prompt: verifiche di contratto (invarianti contabili ⇒ SAFE),
+max chase 15% (ipotesi di test) tra fill osservato del leader e quotazione eseguibile, sia pre-trade
+sia all'esecuzione, libri a frazione fissa per leader, prenotazioni di posizione atomiche a livello
+di portafoglio, breaker di ritardo feed/quotazioni, uscite sicure e registro FMEA (`docs/FMEA.md`)
+con test negativi bloccanti (`tests/test_fmea.py`). Da riconciliare col testo dell'addendum quando
+sarà aggiunto al repository.
 
 ## Decisioni fissate
 

@@ -1,0 +1,1 @@
+<nav class="tabs" aria-label="Strategia">{% for k, v in strategies.items() %}<a href="?s={{ k }}" class="{{ 'active' if k == sid else '' }}" title="{{ v }}">{{ k }}</a>{% endfor %}</nav>

@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% set title = "Operazioni" %}
+{% block content %}
+{% include "_strategy_tabs.html" %}
+<section class="card">
+  <h2>Decisioni COPY / SKIP — {{ strategies.get(sid, sid) }}</h2>
+  <p class="small muted">Ogni decisione mostra i fatti di origine (firma, slot, provenienza). Una copia non eredita mai il prezzo del leader.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Ora</th><th>Decisione</th><th>Lato</th><th>Token</th><th>Leader</th><th>Motivi</th><th class="r">Latenza</th><th>Fatti</th></tr></thead>
+    <tbody>
+    {% for d in decisions %}
+    <tr><td class="small">{{ d.ts.strftime('%d/%m %H:%M:%S') }}</td><td><span class="tag {{ 'copy' if d.decision == 'COPY' else 'skip' }}">{{ d.decision }}</span></td><td>{{ d.side }}</td>
+      <td>{{ d.facts.get('symbol') or symbols.get(d.mint) or d.mint|short }}</td><td class="small">{{ labels.get(d.wallet) or d.wallet|short }}</td>
+      <td class="small">{% for r in d.reasons %}<div>{{ r|reason }}</div>{% endfor %}</td><td class="r small">{{ ((d.latency_ms or 0)/1000)|num(1) }} s</td>
+      <td><details data-key="d{{ d.id }}"><summary>dettagli</summary><dl class="facts">{% for k, v in d.facts.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl></details></td></tr>
+    {% else %}<tr><td colspan="8" class="muted">Nessuna decisione.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>Esecuzioni simulate (incluse fallite / non eseguibili)</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>#</th><th>Stato</th><th>Lato</th><th>Token</th><th>Motivo</th><th class="r">Nozionale</th><th class="r">Prezzo fill</th><th class="r">Impatto</th><th class="r">Slippage stim./eff.</th><th class="r">Commissioni</th><th class="r">Ritardo</th><th>Note</th></tr></thead>
+    <tbody>
+    {% for o in orders %}{% set fe = o.fees or {} %}
+    <tr><td>{{ o.id }}</td><td><span class="tag t-{{ o.state|lower }}">{{ o.state }}</span></td><td>{{ o.side }}</td><td>{{ symbols.get(o.mint) or o.mint|short }}</td><td class="small">{{ o.reason|reason }}</td>
+      <td class="r">{{ o.notional_usd|usd }}</td><td class="r small">{{ o.fill_price_usd|num(8) if o.fill_price_usd else 'n/d' }}</td><td class="r">{{ o.price_impact_pct|num(3) }}%</td>
+      <td class="r">{{ o.est_slippage_bps|num(0) }} / {{ o.actual_slippage_bps|num(0) }} bps</td>
+      <td class="r small">{% if fe %}rete {{ fe.network_usd|usd(3) }}<br>priorità {{ fe.priority_usd|usd(3) }}<br>DEX {{ fe.dex_usd|usd(3) }}<br>rent {{ fe.rent_usd|usd(3) }}{% else %}—{% endif %}</td>
+      <td class="r small">{{ ((o.delay_ms or 0)/1000)|num(1) }} s</td><td class="small muted">{% if o.detail %}{% for k, v in o.detail.items() %}{{ k }}: {{ v if v is not string or v|length < 14 else v[:14] }}<br>{% endfor %}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="12" class="muted">Nessun ordine.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

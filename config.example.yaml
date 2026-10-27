@@ -1,0 +1,108 @@
+# M4 CopyDesk — configurazione di esempio (copiala in config.yaml con `m4desk init`).
+# Nessun segreto va in questo file: le chiavi API stanno solo in .env (escluso da git).
+# Ogni modifica a risk/simulation/trader/strategy produce una NUOVA versione di strategia
+# (hash mostrato in dashboard): i risultati passati non vengono riscritti.
+
+mode: paper                       # solo paper in MVP 0.1 (demo/replay si avviano con `m4desk demo` / `m4desk replay`)
+live_enabled: false               # DEVE restare false: la modalità live non è implementata
+network: solana-mainnet-readonly  # sola lettura
+data_dir: data                    # database SQLite (WAL), report, token dashboard
+
+# Indirizzi PUBBLICI da cui parte la scoperta (opzionali). Mai chiavi private o seed phrase.
+seed_wallets: []
+
+risk:
+  starting_equity_usd: 1000       # capitale VIRTUALE (non è un saldo reale)
+  max_leaders: 3                  # massimo 3 (limite rigido)
+  max_positions: 3                # massimo 3 posizioni contemporanee
+  max_position_pct: 0.05          # max 5% dell'equity corrente per nuova posizione (limite rigido)
+  max_gross_exposure_pct: 0.15    # max 15% di esposizione lorda (limite rigido)
+  max_daily_loss_pct: 0.02        # stop nuovi acquisti oltre il 2% di perdita giornaliera
+  flat_ticket_usd: 20             # strategia di test `flat20`: ticket fisso, mai aumentato dopo vincite
+  min_order_usd: 5
+  # Ipotesi iniziali prudenti: NON garantiscono la sicurezza di un token. Dati mancanti => rifiuto.
+  min_liquidity_usd: 50000
+  max_price_impact_pct: 1.5
+  max_order_liquidity_fraction: 0.02   # ordine <= 2% della liquidità, altrimenti NON ESEGUIBILE
+  max_price_age_s: 90
+  max_quote_age_s: 30
+  max_slippage_bps: 150
+  min_token_age_minutes: 120
+  max_top10_holder_pct: 60
+  max_rugcheck_score_normalised: 30
+  min_lp_locked_pct: 0            # il valore deve essere NOTO (None => rifiuto), fonte registrata
+  lp_lock_unknown_policy: reject
+  max_event_age_s: 120            # eventi del leader più vecchi non vengono copiati
+  consecutive_loss_limit: 2       # perdite nette consecutive (posizioni chiuse) prima del blocco del leader
+  cooldown_s: 600
+  stop_loss_pct: 0.25             # eseguito al prezzo osservato DOPO il ritardo, non al livello dello stop
+  take_profit_pct: 1.0
+  max_hold_hours: 72
+  token_check_ttl_s: 300
+  allowed_token2022_extensions: [metadataPointer, tokenMetadata, groupPointer, groupMemberPointer, tokenGroup, tokenGroupMember]
+  # Addendum sicurezza
+  max_chase_pct: 15               # ipotesi di test: prezzo eseguibile max +15% sul fill osservato del leader
+  leader_book_fraction: null      # null = 1/max_leaders dell'esposizione massima per ciascun leader
+  feed_lag_max_s: 60              # breaker: ritardo evento->osservazione
+  quote_lag_max_s: 20             # breaker: ritardo quotazione
+  breaker_trip_count: 3
+  breaker_recover_count: 3
+
+simulation:
+  fill_delay_s: 4                 # attesa prima della quotazione di esecuzione simulata
+  base_fee_lamports: 5000
+  priority_fee_lamports: 50000
+  dex_fee_bps: 30                 # applicata SEMPRE in aggiunta (prudente)
+  account_rent_lamports: 2039280  # rent dell'account token, rimborsato solo alla chiusura totale
+  extra_slippage_bps: 50          # slippage avverso oltre l'impatto quotato
+  quote_deviation_max_pct: 3
+  max_exit_price_impact_pct: 15
+
+trader:
+  min_round_trips: 8              # sotto questa soglia: DATI INSUFFICIENTI
+  min_score: 0.55
+  min_median_hold_s: 120          # trader troppo veloci non sono copiabili con ritardo
+  max_history_tx: 100
+  lookback_days: 30
+
+strategy:
+  primary: switch2
+  enabled: [switch2, switch3, naive, ai_rank, flat20]
+
+discovery:
+  max_candidates: 25
+  max_token_scans_per_cycle: 3
+  swaps_per_token_scan: 20
+  interval_s: 900
+
+providers:
+  rpc_http_url: https://api.mainnet-beta.solana.com   # pubblico: NON production-grade, 429 frequenti
+  rpc_ws_url: wss://api.mainnet-beta.solana.com
+  use_helius: false               # true => serve HELIUS_API_KEY (piano Free, nessuna carta) in .env
+  helius_http_url: https://mainnet.helius-rpc.com/
+  helius_ws_url: wss://mainnet.helius-rpc.com/
+  dexscreener_url: https://api.dexscreener.com
+  jupiter_url: https://api.jup.ag  # Swap API v2, solo /swap/v2/order senza taker (quotazione)
+  rugcheck_url: https://api.rugcheck.xyz
+  rugcheck_enabled: true          # false => SOLO OSSERVAZIONE (nessun nuovo acquisto)
+  http_timeout_s: 10
+  poll_interval_s: 20
+  price_refresh_s: 30
+  budget:                         # limiti locali prudenti; a esaurimento si fermano scoperta e acquisti
+    rpc: {daily_requests: 20000, monthly_requests: 300000, per_minute: 60}
+    dexscreener: {daily_requests: 10000, monthly_requests: 250000, per_minute: 50}
+    jupiter: {daily_requests: 3000, monthly_requests: 60000, per_minute: 30}
+    rugcheck: {daily_requests: 1000, monthly_requests: 20000, per_minute: 10}
+
+llm:
+  enabled: true                   # se Ollama non risponde si usa la baseline deterministica
+  base_url: http://127.0.0.1:11434
+  model: qwen3.5:9b
+  timeout_s: 60
+  max_concurrency: 1              # un solo modello condiviso, coda limitata
+  max_queue: 8
+
+dashboard:
+  host: 127.0.0.1                 # mai esposta su Internet
+  port: 8765
+  allow_non_local: false

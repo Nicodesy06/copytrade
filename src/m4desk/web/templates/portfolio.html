@@ -1,0 +1,34 @@
+{% extends "base.html" %}{% set title = "Portafoglio" %}
+{% block content %}
+{% include "_strategy_tabs.html" %}
+<section class="kpis">
+  <div class="card kpi"><span class="label">Cassa virtuale</span><span class="value">{{ st.cash|usd }}</span><span class="sub">non è un saldo bancario</span></div>
+  <div class="card kpi"><span class="label">Equity stimata</span><span class="value">{{ st.equity_estimate|usd }}</span><span class="sub">prudenziale (senza prezzi stantii) {{ st.equity_conservative|usd }}</span></div>
+  <div class="card kpi"><span class="label">Realizzato / non realizzato</span><span class="value">{{ st.realized|usd }}</span><span class="sub">{{ st.unrealized|usd }}</span></div>
+  <div class="card kpi"><span class="label">Commissioni pagate</span><span class="value">{{ st.fees_usd|usd }}</span><span class="sub">rete + priorità + DEX</span></div>
+</section>
+<section class="card">
+  <h2>Posizioni aperte</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Token</th><th>Leader</th><th class="r">Quantità</th><th class="r">Prezzo ingresso</th><th class="r">Ultimo prezzo</th><th class="r">Valore</th><th class="r">Costo residuo</th><th class="r">Non realizz.</th><th>Prezzo</th><th class="r">Uscite parziali</th></tr></thead>
+    <tbody>{% for r in open %}<tr><td>{{ r.p.symbol or r.p.mint|short }}</td><td class="small">{{ labels.get(r.p.leader) or r.p.leader|short }}</td><td class="r">{{ r.qty|num(2) }}</td><td class="r">{{ r.p.entry_price_usd|num(8) }}</td><td class="r">{{ r.p.last_price_usd|num(8) }}</td><td class="r">{{ r.value|usd }}</td><td class="r">{{ r.p.cost_basis_usd|usd }}</td><td class="r">{{ r.unreal|usd }}</td><td>{% if r.stale %}<span class="tag skip">STANTIO</span>{% else %}<span class="tag copy">aggiornato</span>{% endif %}</td><td class="r">{{ r.p.partial_exits }}</td></tr>
+    {% else %}<tr><td colspan="10" class="muted">Nessuna posizione aperta.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>Posizioni chiuse (P&amp;L netto di tutte le commissioni)</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Token</th><th>Leader</th><th>Apertura</th><th>Chiusura</th><th class="r">Costo totale</th><th class="r">Incasso netto</th><th class="r">P&amp;L realizzato</th><th class="r">Commissioni</th><th>Motivo</th><th class="r">Parziali</th></tr></thead>
+    <tbody>{% for p in closed %}<tr><td>{{ p.symbol or p.mint|short }}</td><td class="small">{{ labels.get(p.leader) or p.leader|short }}</td><td class="small">{{ p.opened_at.strftime('%d/%m %H:%M') }}</td><td class="small">{{ p.closed_at.strftime('%d/%m %H:%M') }}</td><td class="r">{{ p.total_cost_usd|usd }}</td><td class="r">{{ p.proceeds_usd|usd }}</td><td class="r {{ 'pos' if p.realized_pnl_usd > 0 else 'neg' }}">{{ p.realized_pnl_usd|usd }}</td><td class="r">{{ p.fees_usd|usd }}</td><td class="small">{{ p.close_reason|reason }}</td><td class="r">{{ p.partial_exits }}</td></tr>
+    {% else %}<tr><td colspan="10" class="muted">Nessuna posizione chiusa.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>P&amp;L e drawdown per trader</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Leader</th><th class="r">Posizioni</th><th class="r">Aperte</th><th class="r">Realizzato</th><th class="r">Win rate</th><th class="r">Max drawdown</th><th class="r">Commissioni</th></tr></thead>
+    <tbody>{% for l in per_leader %}<tr><td>{{ labels.get(l.leader) or l.leader|short }}</td><td class="r">{{ l.positions }}</td><td class="r">{{ l.open }}</td><td class="r {{ 'pos' if l.realized > 0 else 'neg' if l.realized < 0 else '' }}">{{ l.realized|usd }}</td><td class="r">{{ l.win_rate|pct(0) }}</td><td class="r">{{ l.max_drawdown_usd|usd }}</td><td class="r">{{ l.fees|usd }}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">Nessun dato.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% set title = "Token" %}
+{% block content %}
+<section class="card">
+  <p class="small muted">Politica rigida e fail-closed: dati mancanti = rifiuto. Nessuna soglia garantisce la sicurezza di un token. I metadati (nome, descrizione) sono testo non fidato: vengono sanificati, mai eseguiti né passati all'LLM.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Token</th><th>Esito</th><th>Motivi</th><th class="r">Liquidità</th><th class="r">Età</th><th>Authority</th><th>Rugcheck</th><th>Controllato</th></tr></thead>
+    <tbody>
+    {% for c in checks %}{% set f = c.facts %}
+    <tr><td><strong>{{ c.symbol or c.mint|short }}</strong><br><code class="small">{{ c.mint|short(8) }}</code></td>
+      <td><span class="tag ck-{{ c.status|lower }}">{{ c.status }}</span></td>
+      <td class="small">{% for r in c.reasons %}<div>{{ r|reason }} <code>{{ r }}</code></div>{% else %}{{ 'OK'|reason }}{% endfor %}</td>
+      <td class="r">{{ (f.get('market') or {}).get('liquidity_usd')|usd(0) }}</td>
+      <td class="r">{{ (f.get('age_minutes', 0)/60)|num(1) if f.get('age_minutes') is not none else 'n/d' }} h</td>
+      <td class="small">{% set oc = f.get('onchain') or {} %}{{ oc.get('program', 'n/d') }}<br>mint: {{ oc.get('mint_authority')|short if oc.get('mint_authority') else 'revocata' }}<br>freeze: {{ oc.get('freeze_authority')|short if oc.get('freeze_authority') else 'revocata' }}{% if f.get('unsupported_extensions') %}<br><span class="neg">estensioni: {{ f.unsupported_extensions|join(', ') }}</span>{% endif %}</td>
+      <td class="small">{% set rc = f.get('rugcheck') %}{% if rc is mapping %}score {{ rc.score_normalised }} · LP bloccata {{ rc.lp_locked_pct or 'n/d' }}% ({{ rc.lp_source or 'fonte n/d' }}) · top10 {{ rc.top10_pct or 'n/d' }}%{% else %}{{ rc or f.get('rugcheck_error', 'n/d') }}{% endif %}</td>
+      <td class="small">{{ c.checked_at.strftime('%d/%m %H:%M:%S') }}</td></tr>
+    {% else %}<tr><td colspan="8" class="muted">Nessun token controllato.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

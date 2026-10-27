@@ -1,0 +1,58 @@
+{% if not partial %}<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="m4-token" content="{{ csrf }}">
+<title>M4 CopyDesk · {{ title|default('Panoramica') }}</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<a class="skiplink" href="#content">Vai al contenuto</a>
+<div class="shell">
+  <aside class="sidebar" aria-label="Navigazione principale">
+    <div class="brand"><img src="/static/icon.svg" alt="" width="28" height="28"><span>M4 CopyDesk</span></div>
+    <nav>
+      {% for href, label in nav %}
+      <a href="{{ href }}" class="{{ 'active' if active == href else '' }}" {% if active == href %}aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="side-foot">
+      <button type="button" class="ghost" id="theme-toggle" aria-label="Cambia tema chiaro/scuro">◐ Tema</button>
+      <p class="muted small">Solo ricerca. Nessuna transazione reale.</p>
+    </div>
+  </aside>
+  <main>
+{% endif %}
+<div id="content" data-live="1">
+  <header class="topbar">
+    <div class="mode">
+      <span class="badge badge-mode">{{ 'PAPER' if mode in ('paper','demo','replay') else mode|upper }}</span>
+      {% if mode in ('demo','replay') %}<span class="badge badge-demo">{{ mode|upper }}</span>{% endif %}
+      <span class="badge state-{{ state|lower }}" title="Stato del sistema">{{ {'RUNNING':'ATTIVO','PAUSED':'ACQUISTI IN PAUSA','SAFE':'MODALITÀ SICURA','STOPPED':'ARRESTATO'}[state] }}</span>
+      <span class="muted small">strategia {{ version }}</span>
+    </div>
+    <div class="controls" role="group" aria-label="Controlli">
+      <button type="button" class="btn warn" data-action="pause" data-label="PAUSA NUOVI ACQUISTI">PAUSA NUOVI ACQUISTI</button>
+      <button type="button" class="btn ok" data-action="resume" data-label="RIPRENDI">RIPRENDI</button>
+      <button type="button" class="btn danger" data-action="stop" data-label="ARRESTA">ARRESTA</button>
+    </div>
+  </header>
+  {% if simulated %}
+  <div class="banner-sim" role="note"><strong>{{ origin }}</strong> — tutti i wallet, token, prezzi ed esiti in questa vista sono {{ 'sintetici' if origin.startswith('SIMULATO') else 'riprodotti da fixture' }}. Ora simulata: {{ now.strftime('%d/%m/%Y %H:%M') }} UTC.</div>
+  {% else %}
+  <div class="banner-paper" role="note">PAPER su mainnet in sola lettura: P&amp;L <strong>virtuale</strong>, non è un saldo reale.</div>
+  {% endif %}
+  {% if state == 'SAFE' %}<div class="banner-safe" role="alert">Modalità sicura attiva: nuovi acquisti bloccati finché un umano non preme RIPRENDI. Controlla la pagina Rischi.</div>{% endif %}
+  <h1>{{ title|default('Panoramica') }}</h1>
+  {% block content %}{% endblock %}
+</div>
+{% if not partial %}
+  <footer class="muted small">M4 CopyDesk · €0 abbonamenti · P&amp;L simulato su capitale virtuale · nessun rendimento promesso</footer>
+  </main>
+</div>
+</body>
+</html>
+{% endif %}

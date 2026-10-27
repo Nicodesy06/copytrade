@@ -36,7 +36,10 @@ API proprietarie di bot, endpoint Jupiter deprecati, qualsiasi LLM remoto.
   ritardo 7 s, 6 richieste totali). L'RPC pubblico da IP cloud condiviso risponde `429` dopo poche
   richieste: il sistema resta fail-closed e riprova ogni 2 minuti; per uso continuativo serve Helius free.
 - [ ] **F9 (futuro)** Ricostruzione storica estesa con finestre hold-out su dati reali (richiede raccolta forward-paper).
-- [ ] **F10 (futuro, opzionale)** Modulo live isolato: **non implementato**, vedi `docs/LIVE_CHECKLIST.md`.
+- [x] **F10** Modulo live opt-in richiesto dall'utente (wallet Fomo, autonomo dopo "ARMA LIVE", 0,05 SOL/op,
+  0,2 SOL/giorno, notifiche ntfy): chiave nel Portachiavi, ispezione + simulazione prima della firma,
+  disarmo automatico, vendite protettive con retry. Verificato offline e con transazioni Jupiter reali
+  ispezionate/simulate senza firma; nessuna esecuzione firmata eseguita durante lo sviluppo.
 
 ## Addendum sicurezza (04_ADDENDUM_SAFETY_FMEA_E_RISK_ENGINE.md)
 

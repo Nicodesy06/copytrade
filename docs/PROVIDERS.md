@@ -20,6 +20,9 @@ Le richieste sono state eseguite davvero e le risposte salvate in `tests/fixture
 | Jupiter Swap API v2 | `GET https://api.jup.ag/swap/v2/order` **senza `taker`** | keyless (limiti ridotti) o chiave gratuita `x-api-key` | budget prudente 30/min | quotazione ritardata per i fill simulati |
 | Rugcheck | `GET /v1/tokens/{mint}/report`, `/report/summary` | nessuna per la lettura | budget prudente 10/min, cache 300 s | rischi, authority, holder, LP |
 | Ollama | `POST /api/chat` con `format` = JSON schema | locale | concorrenza 1, coda 8, timeout 60 s | ranking consultivo |
+| Jupiter (solo LIVE) | `GET /swap/v2/order` **con** `taker` + `excludeRouters=jupiterz`, `POST /swap/v2/execute` | keyless o chiave gratuita | `/execute` keyless 20 RPS; commissione di piattaforma Jupiter 0–50 bps inclusa nella quotazione | esecuzione reale opt-in |
+| Solana RPC (solo LIVE) | `getBalance`, `getTokenAccountsByOwner`, `simulateTransaction`, `getSignatureStatuses` | come sopra | — | controlli e simulazione prima della firma |
+| ntfy | `POST https://ntfy.sh/<topic>` | nessun account (il topic è segreto) | limiti del server pubblico gratuito; locale max 30/ora | notifiche sul telefono |
 
 ### Note di schema importanti
 
@@ -34,7 +37,7 @@ Le richieste sono state eseguite davvero e le risposte salvate in `tests/fixture
 
 ### Non usati
 
-Endpoint deprecati `lite-api.jup.ag` / `quote-api.jup.ag`, `/swap/v2/execute`, Helius enhanced
+Endpoint deprecati `lite-api.jup.ag` / `quote-api.jup.ag` (e `/swap/v2/execute` fuori dal modulo live), Helius enhanced
 websockets / `transactionSubscribe`, PumpPortal, API proprietarie di bot, qualsiasi LLM remoto.
 
 ## Limiti del costo zero (onestà)
@@ -69,6 +72,8 @@ ritardo dal fill del leader. Ogni riga di `token_checks` salva i fatti grezzi co
 | PyYAML | MIT |
 | pytest, pytest-asyncio (dev) | MIT, Apache-2.0 |
 | ruff (dev) | MIT |
+| solders (firma, solo live) | MIT / Apache-2.0 |
+| keyring (Portachiavi, solo live) | MIT |
 | Ollama (esterno, opzionale) | MIT |
 
 Nessun asset frontend esterno: CSS/JS/icona sono scritti nel repository.

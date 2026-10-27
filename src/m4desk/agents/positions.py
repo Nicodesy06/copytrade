@@ -204,6 +204,23 @@ class PositionManagerAgent(Agent):
                 self._breaker_audit(self.rt.quote_breaker, lag)
             await self._publish_order(o)
             await self._after_fill_checks(sid)
+            if o.state == OrderState.FILLED.value:
+                await self._mirror_live("buy", sid, o, Decimal(1))
+
+    async def _mirror_live(self, side: str, sid: str, o: Order, fraction: Decimal) -> None:
+        """Il live replica SOLO gli ordini paper eseguiti della strategia primaria (stessi controlli di rischio)."""
+        live = self.rt.live
+        if live is None or sid != self.rt.cfg.strategy.primary:
+            return
+        try:
+            res = await (live.on_paper_buy(o) if side == "buy" else live.on_paper_sell(o, fraction))
+        except Exception as e:  # il live non deve mai fermare il motore paper
+            res = f"ERRORE {type(e).__name__}"
+        self.rt.db.audit(self.name, f"live.{side}", f"[live] {side} {o.mint[:8]}…: {res}", {"order_id": o.id},
+                         "INFO" if res in ("SUCCESS", "LIVE_NOT_ARMED", "LIVE_DISABLED") else "WARN",
+                         ts=self.rt.clock.now())
+        if self.rt.notifier is not None and self.rt.cfg.notify.paper_events:
+            await self.rt.notifier.send(f"PAPER {side}", f"{sid} {o.mint[:8]}… {o.state}")
 
     async def _after_fill_checks(self, sid: str) -> None:
         from ..services.safety import check_contracts
@@ -252,6 +269,9 @@ class PositionManagerAgent(Agent):
                 p = s.get(Position, pos_id)
                 assert p is not None
                 closed, realized, leader = p.status == "CLOSED", p.realized_pnl_usd, p.leader
+                before = p.qty_raw + (o.qty_raw or 0)
+            frac = Decimal(1) if closed or not before else Decimal(o.qty_raw or 0) / Decimal(before)
+            await self._mirror_live("sell", sid, o, frac)
             if closed:
                 await self.rt.bus.publish(make_event(
                     EventType.POSITION_CLOSED, self.name, (sid, pos_id), self.rt.origin, "paper-broker", now,

@@ -142,6 +142,32 @@ class LLMConfig(_Strict):
         return v
 
 
+class LiveConfig(_Strict):
+    """Esecuzione REALE (opt-in). Attiva solo con live_enabled=true, network=solana-mainnet,
+    chiave nel Portachiavi e comando esplicito "ARMA LIVE" dopo ogni avvio del motore."""
+
+    wallet_pubkey: str | None = None  # indirizzo PUBBLICO atteso: la chiave importata deve corrispondere
+    max_sol_per_trade: Decimal = Field(Decimal("0.05"), gt=0, le=Decimal("1"))
+    max_sol_per_day: Decimal = Field(Decimal("0.2"), gt=0, le=Decimal("5"))
+    max_open_positions: int = Field(3, ge=1, le=3)
+    min_sol_reserve: Decimal = Field(Decimal("0.02"), ge=Decimal("0.01"))  # mai spendere sotto questo saldo
+    max_priority_fee_lamports: int = Field(200_000, ge=0, le=2_000_000)
+    max_fee_margin_lamports: int = Field(3_000_000, ge=0, le=10_000_000)  # tolleranza simulazione (fee+rent)
+    exclude_routers: list[str] = ["jupiterz"]  # RFQ: richiede una seconda firma del market maker
+    allow_exits_when_disarmed: bool = True  # le vendite protettive restano attive anche se disarmato
+    max_consecutive_failures: int = Field(3, ge=1)
+    request_timeout_s: float = 20.0
+
+
+class NotifyConfig(_Strict):
+    """Notifiche push sul telefono via ntfy (gratuito, open source, nessun account)."""
+
+    enabled: bool = False
+    server: str = "https://ntfy.sh"
+    paper_events: bool = False  # true = anche gli ordini simulati
+    max_per_hour: int = 30
+
+
 class DashboardConfig(_Strict):
     host: str = "127.0.0.1"
     port: int = 8765
@@ -157,7 +183,7 @@ class DashboardConfig(_Strict):
 class AppConfig(_Strict):
     mode: Mode = Mode.PAPER
     live_enabled: bool = False
-    network: Literal["solana-mainnet-readonly"] = "solana-mainnet-readonly"
+    network: Literal["solana-mainnet-readonly", "solana-mainnet"] = "solana-mainnet-readonly"
     data_dir: str = "data"
     seed_wallets: list[str] = []
     risk: RiskConfig = RiskConfig()
@@ -168,14 +194,20 @@ class AppConfig(_Strict):
     providers: ProvidersConfig = ProvidersConfig()
     llm: LLMConfig = LLMConfig()
     dashboard: DashboardConfig = DashboardConfig()
+    live: LiveConfig = LiveConfig()
+    notify: NotifyConfig = NotifyConfig()
 
     @model_validator(mode="after")
-    def _no_live(self) -> AppConfig:
-        if self.live_enabled or self.mode == Mode.LIVE:
-            raise ValueError(
-                "Modalità live NON implementata in MVP 0.1: live_enabled deve essere false "
-                "(vedi docs/LIVE_CHECKLIST.md)"
-            )
+    def _live_gate(self) -> AppConfig:
+        if self.mode == Mode.LIVE:
+            raise ValueError("mode deve restare 'paper': il live è un livello opzionale sopra la strategia primaria")
+        if self.live_enabled:
+            if self.network != "solana-mainnet":
+                raise ValueError("live_enabled=true richiede anche network: solana-mainnet (doppio consenso esplicito)")
+            if not self.live.wallet_pubkey:
+                raise ValueError("live_enabled=true richiede live.wallet_pubkey (indirizzo PUBBLICO atteso)")
+        elif self.network != "solana-mainnet-readonly":
+            raise ValueError("network: solana-mainnet è ammesso solo con live_enabled=true")
         return self
 
     def strategy_version(self) -> str:
@@ -200,6 +232,49 @@ class Secrets(BaseSettings):
     helius_api_key: SecretStr | None = Field(default=None, alias="HELIUS_API_KEY")
     jupiter_api_key: SecretStr | None = Field(default=None, alias="JUPITER_API_KEY")
     dashboard_token: SecretStr | None = Field(default=None, alias="M4DESK_DASHBOARD_TOKEN")
+    ntfy_topic: SecretStr | None = Field(default=None, alias="NTFY_TOPIC")
+
+
+def ensure_env_secrets(env: Path) -> list[str]:
+    """Genera nel file .env i valori casuali mancanti (token dashboard, topic ntfy). Ritorna i nomi creati."""
+    import os
+    import re
+    import secrets as pysecrets
+
+    txt = env.read_text(encoding="utf-8") if env.exists() else ""
+    made = []
+    for name, gen in (("M4DESK_DASHBOARD_TOKEN", lambda: pysecrets.token_urlsafe(24)),
+                      ("NTFY_TOPIC", lambda: "m4desk-" + pysecrets.token_urlsafe(18))):
+        if re.search(rf"^{name}=\S+", txt, re.M) is None:
+            txt = re.sub(rf"^{name}=.*$\n?", "", txt, flags=re.M).rstrip() + f"\n{name}={gen()}\n"
+            made.append(name)
+    env.write_text(txt.lstrip("\n"), encoding="utf-8")
+    os.chmod(env, 0o600)
+    return made
+
+
+def set_yaml_value(path: Path, dotted: str, value: str) -> bool:
+    """Sostituisce `chiave: valore` di primo/secondo livello in config.yaml preservando i commenti."""
+    import re
+
+    text = path.read_text(encoding="utf-8")
+    parts = dotted.split(".")
+    if len(parts) == 1:
+        pat = rf"^({parts[0]}:)[^\n#]*"
+    else:
+        block = re.search(rf"^{parts[0]}:\n((?:[ \t]+.*\n?|\n)*)", text, re.M)
+        if not block:
+            return False
+        inner = block.group(1)
+        new_inner, n = re.subn(rf"^([ \t]+{parts[1]}:)[^\n#]*", rf"\g<1> {value} ", inner, count=1, flags=re.M)
+        if not n:
+            return False
+        path.write_text(text[: block.start(1)] + new_inner + text[block.end(1):], encoding="utf-8")
+        return True
+    new, n = re.subn(pat, rf"\g<1> {value} ", text, count=1, flags=re.M)
+    if n:
+        path.write_text(new, encoding="utf-8")
+    return bool(n)
 
 
 def load_config(path: str | Path | None = None) -> AppConfig:

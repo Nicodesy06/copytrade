@@ -4,8 +4,8 @@
 # (hash mostrato in dashboard): i risultati passati non vengono riscritti.
 
 mode: paper                       # solo paper in MVP 0.1 (demo/replay si avviano con `m4desk demo` / `m4desk replay`)
-live_enabled: false               # DEVE restare false: la modalità live non è implementata
-network: solana-mainnet-readonly  # sola lettura
+live_enabled: false               # true = ESECUZIONE REALE con soldi veri (vedi sezione live: sotto)
+network: solana-mainnet-readonly  # con live_enabled: true va impostato a solana-mainnet (doppio consenso)
 data_dir: data                    # database SQLite (WAL), report, token dashboard
 
 # Indirizzi PUBBLICI da cui parte la scoperta (opzionali). Mai chiavi private o seed phrase.
@@ -103,6 +103,29 @@ llm:
   timeout_s: 60
   max_concurrency: 1              # un solo modello condiviso, coda limitata
   max_queue: 8
+
+# ESECUZIONE REALE (opt-in). Replica SOLO gli ordini paper eseguiti della strategia primaria.
+# Richiede: live_enabled: true, network: solana-mainnet, chiave importata con `m4desk live import-key`
+# (Portachiavi di macOS), e `m4desk live arm` ("ARMA LIVE") dopo OGNI avvio del motore.
+live:
+  wallet_pubkey: null             # indirizzo PUBBLICO del wallet (es. quello di Fomo): la chiave deve coincidere
+  max_sol_per_trade: 0.05         # importo fisso per acquisto (max 1)
+  max_sol_per_day: 0.2            # spesa reale massima al giorno, commissioni incluse (max 5)
+  max_open_positions: 3
+  min_sol_reserve: 0.02           # il bot non scende mai sotto questo saldo SOL
+  max_priority_fee_lamports: 200000
+  max_fee_margin_lamports: 3000000   # tolleranza della simulazione per commissioni e rent
+  exclude_routers: [jupiterz]     # RFQ con doppia firma: escluso, ogni transazione ha un solo firmatario
+  allow_exits_when_disarmed: true # le vendite protettive restano attive anche da disarmato
+  max_consecutive_failures: 3     # dopo N errori il live si disarma
+  request_timeout_s: 20
+
+# Notifiche push sul telefono con ntfy (gratuito): installa l'app ntfy e iscriviti al topic NTFY_TOPIC del .env
+notify:
+  enabled: false
+  server: https://ntfy.sh
+  paper_events: false             # true = notifica anche gli ordini simulati
+  max_per_hour: 30
 
 dashboard:
   host: 127.0.0.1                 # mai esposta su Internet

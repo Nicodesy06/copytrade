@@ -14,10 +14,10 @@ hidden = (
     collect_submodules("uvicorn")
     + collect_submodules("m4desk")
     + collect_submodules("sqlalchemy.dialects.sqlite")
-    + ["websockets.legacy", "websockets.asyncio.client", "pydantic_settings"]
+    + ["websockets.legacy", "websockets.asyncio.client", "pydantic_settings", "keyring.backends"]
 )
 if sys.platform == "darwin":
-    hidden += ["rumps"]
+    hidden += ["rumps", "keyring.backends.macOS"]
 
 a = Analysis(
     [str(ROOT / "packaging" / "m4desk_app.py")],

@@ -127,25 +127,33 @@ async def test_contract_violation_detected_and_safe_mode(tmp_path):
     assert rt.system_state() == SystemState.RUNNING
 
 
-def test_no_signing_code_anywhere():
+def test_signing_code_only_inside_live_package():
     src = Path(__file__).parents[1] / "src" / "m4desk"
-    text = "\n".join(p.read_text() for p in src.rglob("*.py"))
-    for forbidden in ("Keypair", "solders", "sign_transaction", "signTransaction", "v2/execute", "private_key ="):
-        assert forbidden not in text, forbidden
-    from m4desk.live import LiveDisabledError, execute, preflight
+    live = src / "live"
+    outside = "\n".join(p.read_text() for p in src.rglob("*.py") if live not in p.parents)
+    for forbidden in ("Keypair", "solders", "keyring", "sign_transaction", "signTransaction", "v2/execute",
+                      "private_key ="):
+        assert forbidden not in outside, forbidden
+    # nemmeno il pacchetto live invia transazioni via RPC: solo Jupiter /execute dopo ispezione+simulazione
+    assert '"sendTransaction"' not in "\n".join(p.read_text() for p in live.rglob("*.py")).replace(
+        'if method == "sendTransaction"', "")
 
-    with pytest.raises(LiveDisabledError):
-        execute()
-    assert all(not x.ok for x in preflight())
 
-
-def test_live_mode_rejected_by_config():
+def test_live_requires_double_opt_in():
     from pydantic import ValidationError
 
     from m4desk.config import AppConfig
 
     with pytest.raises(ValidationError):
-        AppConfig(live_enabled=True)
+        AppConfig(live_enabled=True)  # manca network solana-mainnet e wallet atteso
+    with pytest.raises(ValidationError):
+        AppConfig(live_enabled=True, network="solana-mainnet")  # manca wallet_pubkey
+    with pytest.raises(ValidationError):
+        AppConfig(network="solana-mainnet")  # mainnet scrivibile solo con live_enabled
+    ok = AppConfig(live_enabled=True, network="solana-mainnet", live={"wallet_pubkey": "SimWa11et111"})
+    assert ok.live.max_sol_per_trade == Decimal("0.05") and ok.live.max_sol_per_day == Decimal("0.2")
+    with pytest.raises(ValidationError):
+        AppConfig(live={"max_sol_per_trade": 5})
     with pytest.raises(ValidationError):
         AppConfig(mode="live")
     with pytest.raises(ValidationError):

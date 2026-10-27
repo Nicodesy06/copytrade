@@ -24,7 +24,7 @@ HERE = Path(__file__).parent
 NAV = [
     ("/", "Panoramica"), ("/agenti", "Agenti"), ("/trader", "Trader"), ("/token", "Token"),
     ("/operazioni", "Operazioni"), ("/portafoglio", "Portafoglio"), ("/rischi", "Rischi"), ("/report", "Report"),
-    ("/impostazioni", "Impostazioni"), ("/log", "Log"),
+    ("/impostazioni", "Impostazioni"), ("/log", "Log"), ("/live", "Live"),
 ]
 ACTIONS = {
     "pause": (SystemState.PAUSED, "PAUSA NUOVI ACQUISTI"),
@@ -176,6 +176,48 @@ def create_app(db_paths: str | Path | dict[str, Path], cfg: AppConfig, secrets: 
     @app.get("/log", response_class=HTMLResponse)
     def logs(request: Request, level: str | None = None):
         return render(request, "logs.html", V(request).logs(level), "/log")
+
+    @app.get("/live", response_class=HTMLResponse)
+    def live_page(request: Request):
+        return render(request, "live.html", V(request).live(), "/live")
+
+    def _check_write(request: Request) -> None:
+        if not hmac.compare_digest(request.headers.get("x-m4-token", ""), token):
+            raise HTTPException(403, "token non valido")
+        origin = request.headers.get("origin")
+        if origin and (origin.split("//")[-1].split(":")[0].strip("[]") not in allowed):
+            raise HTTPException(403, "origine non consentita")
+
+    def _live_for_paper():
+        if "paper" not in dbs and "default" not in dbs:
+            raise HTTPException(400, "il live riguarda solo il database PAPER")
+        if not cfg.live_enabled:
+            raise HTTPException(400, "live_enabled è false in config.yaml")
+        from ..clock import Clock
+        from ..live import build_live
+
+        d = dbs.get("paper") or dbs["default"]
+        live = build_live(cfg, d, Clock(), secrets, None)
+        boot = d.get_meta("engine_boot_id")
+        if not boot:
+            raise HTTPException(409, "il motore PAPER non è in esecuzione")
+        live.boot_id = boot
+        return live
+
+    @app.post("/api/live/arm")
+    async def live_arm(request: Request):
+        _check_write(request)
+        body = await request.json()
+        ok, msg = await _live_for_paper().arm(str(body.get("confirm", "")), "human:dashboard")
+        if not ok:
+            raise HTTPException(400, msg)
+        return {"ok": True, "messaggio": msg}
+
+    @app.post("/api/live/disarm")
+    async def live_disarm(request: Request):
+        _check_write(request)
+        _live_for_paper().disarm("dashboard", "human:dashboard")
+        return {"ok": True}
 
     @app.get("/api/state")
     def state(request: Request):

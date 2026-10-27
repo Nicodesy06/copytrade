@@ -12,3 +12,7 @@ usati dagli adapter (nessuna chiave, nessun dato privato). Usate solo nei test o
 
 Nota: per BONK il summary riporta `lpLockedPct≈15.96`, mentre i singoli mercati del report
 riportano `lp.lpLockedPct = 0`: il valore dipende dall'endpoint e non va mai assunto.
+- `jup_order_taker.json`: `GET /swap/v2/order` CON `taker` (indirizzo pubblico) e `excludeRouters=jupiterz`:
+  transazione v0 NON firmata (1 firmatario) per 0,01 SOL → BONK. Mai firmata né inviata.
+- `rpc_simulate_buy.json`: `simulateTransaction` della transazione sopra (`sigVerify: false`,
+  `replaceRecentBlockhash: true`): saldo del taker dopo la simulazione = saldo − 0,01 SOL − commissioni.

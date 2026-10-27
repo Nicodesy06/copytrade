@@ -5,16 +5,14 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-import os
 import re
-import secrets as pysecrets
 import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 from . import __version__
-from .config import AppConfig, load_config, load_secrets
+from .config import AppConfig, ensure_env_secrets, load_config, load_secrets, set_yaml_value
 from .types import Mode, SystemState
 
 BASE58 = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
@@ -133,14 +131,8 @@ def cmd_init(args) -> int:
             print(f"ATTENZIONE: {src} non trovato")
     env = cwd / ".env"
     if env.exists():
-        txt = env.read_text()
-        if re.search(r"^M4DESK_DASHBOARD_TOKEN=\S+", txt, re.M) is None:
-            tok = pysecrets.token_urlsafe(24)
-            txt = re.sub(r"^M4DESK_DASHBOARD_TOKEN=.*$", "", txt, flags=re.M).rstrip()
-            txt += f"\nM4DESK_DASHBOARD_TOKEN={tok}\n"
-            env.write_text(txt)
-            print("generato M4DESK_DASHBOARD_TOKEN in .env (protegge i pulsanti della dashboard)")
-        os.chmod(env, 0o600)
+        for name in ensure_env_secrets(env):
+            print(f"generato {name} in .env")
     cfg = _cfg(args)
     Path(cfg.data_dir).mkdir(parents=True, exist_ok=True)
     _open_db(cfg, "paper", must_exist=False)
@@ -414,6 +406,107 @@ def cmd_test_providers(args) -> int:
     return 1 if bad else 0
 
 
+# ------------------------------------------------------------------------------------------ live
+LIVE_WARNING = """
+ATTENZIONE — ESECUZIONE REALE
+Una volta armato, il bot compra e vende DA SOLO con soldi veri dal wallet indicato, entro i limiti
+di config.yaml (live.max_sol_per_trade, live.max_sol_per_day). Puoi perdere l'intero importo
+impiegato. Nessun rendimento è garantito. Si disarma da solo a ogni riavvio del motore, in modalità
+SICURA o dopo errori ripetuti; le vendite protettive restano attive.
+"""
+
+
+def _live_executor(cfg: AppConfig, db_which: str = "paper"):
+    from .clock import Clock
+    from .live import build_live
+    from .services.notify import Notifier
+
+    secrets = load_secrets()
+    db = _open_db(cfg, db_which, must_exist=False)
+    topic = secrets.ntfy_topic.get_secret_value() if secrets.ntfy_topic else None
+    live = build_live(cfg, db, Clock(), secrets, Notifier(cfg.notify, topic))
+    if live is not None:
+        # i comandi CLI agiscono sul motore in esecuzione: stesso boot id del processo motore
+        boot = db.get_meta("engine_boot_id")
+        if boot:
+            live.boot_id = boot
+    return live, db
+
+
+def cmd_live(args) -> int:
+    from .live import CONFIRM_PHRASE, KeyStore, KeyStoreError
+
+    cfg = _cfg(args)
+    c = args.live_cmd
+    if c == "import-key":
+        import getpass
+
+        print(LIVE_WARNING)
+        print("La chiave privata viene letta SENZA mostrarla, salvata SOLO nel Portachiavi di macOS e mai in file,")
+        print("log o chat. Non incollarla mai altrove. Una seed phrase NON è accettata: serve la chiave privata.")
+        ks = KeyStore()
+        ok, info = ks.available()
+        if not ok:
+            raise SystemExit(f"Portachiavi non disponibile: {info}")
+        secret = getpass.getpass("Chiave privata (base58 o array JSON, input nascosto): ")
+        try:
+            pub = ks.store(secret)
+        except KeyStoreError as e:
+            raise SystemExit(f"Chiave non valida: {e}") from e
+        print(f"\nChiave salvata. Indirizzo PUBBLICO: {pub}")
+        print("Verifica che coincida con l'indirizzo Solana mostrato nell'app Fomo (Ricevi/Deposita).")
+        cfg_path = Path(args.config or "config.yaml")
+        question = "Scrivo questo indirizzo in config.yaml (live.wallet_pubkey)? [s/N] "
+        if cfg_path.exists() and input(question).strip().lower() == "s":
+            set_yaml_value(cfg_path, "live.wallet_pubkey", pub)
+            print("Fatto. Per abilitare il live imposta anche live_enabled: true e network: solana-mainnet.")
+        return 0
+    if c == "forget-key":
+        KeyStore().forget()
+        print("Chiave rimossa dal Portachiavi. Il live non può più firmare.")
+        return 0
+    if not cfg.live_enabled:
+        print("Live DISABILITATO (live_enabled: false in config.yaml).")
+        if c != "status":
+            return 1
+    live, db = _live_executor(cfg) if cfg.live_enabled else (None, _open_db(cfg, "paper", must_exist=False))
+    if c == "status":
+        from sqlalchemy import select
+
+        from .storage.db import LiveOrder
+
+        if live is not None:
+            s = live.summary()
+            print(f"Live: {'ARMATO' if s['armed'] else 'disarmato'} · wallet {s['wallet']}")
+            print(f"Speso oggi: {s['spent_today_sol']:.4f} / {s['cap_day_sol']} SOL · posizioni aperte "
+                  f"{s['open_positions']}")
+        with db.session() as sess:
+            for o in sess.scalars(select(LiveOrder).order_by(LiveOrder.id.desc()).limit(15)):
+                print(f"  {o.created_at:%d/%m %H:%M} {o.side:<4} {o.mint[:8]}… {o.state:<12} {o.reason:<22} "
+                      f"{o.signature or ''}")
+        return 0
+    assert live is not None
+    if c == "preflight":
+        checks = asyncio.run(live.preflight())
+        for name, ok, detail in checks:
+            print(f"[{'  OK  ' if ok else 'ERRORE'}] {name}: {detail}")
+        return 0 if all(ok for _, ok, _ in checks) else 1
+    if c == "arm":
+        print(LIVE_WARNING)
+        hb = db.get_meta("engine_boot_id")
+        if not hb:
+            raise SystemExit("Il motore PAPER non è mai stato avviato: esegui prima `m4desk run --mode paper`.")
+        confirm = args.confirm if args.confirm is not None else input(f'Digita "{CONFIRM_PHRASE}" per confermare: ')
+        ok, msg = asyncio.run(live.arm(confirm))
+        print(msg)
+        return 0 if ok else 1
+    if c == "disarm":
+        live.disarm("comando manuale", "human")
+        print("Live disarmato: nessun nuovo acquisto reale. Le vendite protettive restano attive.")
+        return 0
+    return 1
+
+
 # ------------------------------------------------------------------------------------------ parser
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="m4desk", description="M4 CopyDesk — ricerca copy-trading Solana, solo PAPER "
@@ -471,6 +564,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(fn=cmd_report)
     sub.add_parser("test-providers", help="prova i provider gratuiti (USA LA RETE, solo letture)").set_defaults(
         fn=cmd_test_providers)
+    sp = sub.add_parser("live", help="esecuzione REALE opt-in: chiave, preflight, arma/disarma, stato")
+    lsub = sp.add_subparsers(dest="live_cmd", required=True)
+    lsub.add_parser("import-key", help="importa la chiave privata nel Portachiavi (input nascosto)")
+    lsub.add_parser("forget-key", help="rimuove la chiave dal Portachiavi")
+    lsub.add_parser("status", help="stato del live e ultimi ordini reali")
+    lsub.add_parser("preflight", help="controlli completi + prova di swap SIMULATA (nessuna firma)")
+    la = lsub.add_parser("arm", help='arma il live nel motore in esecuzione (richiede "ARMA LIVE")')
+    la.add_argument("--confirm", default=None, help=argparse.SUPPRESS)
+    lsub.add_parser("disarm", help="disarma: nessun nuovo acquisto reale")
+    sp.set_defaults(fn=cmd_live)
     return p
 
 

@@ -28,6 +28,22 @@ jobs:
           .venv/bin/pytest -q
           .venv/bin/ruff check .
 
+      - name: Prova Portachiavi macOS (chiave usa-e-getta, nessun fondo)
+        continue-on-error: true
+        run: |
+          .venv/bin/python - <<'PY'
+          from solders.keypair import Keypair
+          from m4desk.live.keystore import KeyStore, _b58encode
+          ks = KeyStore()
+          print("backend:", ks.available())
+          kp = Keypair()
+          assert ks.store(_b58encode(bytes(kp))) == str(kp.pubkey())
+          assert ks.pubkey() == str(kp.pubkey())
+          ks.forget()
+          assert not ks.has_key()
+          print("Portachiavi macOS: OK")
+          PY
+
       - name: Compila app e DMG
         run: PYTHON=python packaging/build_macos.sh
 

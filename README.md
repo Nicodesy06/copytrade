@@ -89,6 +89,22 @@ m4desk dashboard                              # in un altro terminale (DB paper)
 - Jupiter funziona keyless; una chiave gratuita (`JUPITER_API_KEY`) alza i limiti.
 - Se Rugcheck non è disponibile o disabilitato: **stop ai nuovi acquisti** (modalità SOLO OSSERVAZIONE).
 
+## Live con soldi veri (opzionale) e wallet Fomo
+
+Il live è **spento** di default. Se lo attivi, replica con soldi veri gli ordini PAPER eseguiti della
+strategia primaria, con importo fisso (0,05 SOL) e tetto giornaliero (0,2 SOL), dopo ispezione e
+simulazione di ogni transazione. Può usare la chiave esportata dal tuo wallet Fomo (che quindi vedrai
+muoversi nell'app Fomo) oppure, più sicuro, un wallet dedicato. Notifiche sul telefono con **ntfy**.
+Guida completa e rischi: [docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md).
+
+```zsh
+m4desk live import-key      # chiave privata (input nascosto) → Portachiavi di macOS
+m4desk live preflight       # tutto deve essere OK (nessuna firma)
+m4desk run --mode paper     # in un altro terminale
+m4desk live arm             # digita ARMA LIVE (si disarma a ogni riavvio)
+m4desk live status | m4desk live disarm | m4desk live forget-key
+```
+
 ## Comandi (`m4desk --help` è la fonte definitiva)
 
 | Comando | Cosa fa |
@@ -107,6 +123,7 @@ m4desk dashboard                              # in un altro terminale (DB paper)
 | `m4desk status [--db …]` | stato, agenti, equity simulata |
 | `m4desk report [--db …] [--day AAAA-MM-GG] [--generate]` | report giornaliero in italiano |
 | `m4desk test-providers` | probe dei provider gratuiti (rete, solo letture) |
+| `m4desk live import-key\|forget-key\|status\|preflight\|arm\|disarm` | esecuzione REALE opt-in (vedi sopra) |
 | `m4desk budget [--db …]` | budget e consumo dei provider |
 
 ## Configurazione
@@ -174,7 +191,7 @@ tests/  examples/  scripts/  docs/
 
 ## Costi
 
-- **€0 di abbonamenti software/API**: solo provider gratuiti/keyless e un LLM locale.
+- **€0 di abbonamenti software/API**: solo provider gratuiti/keyless, ntfy gratuito e un LLM locale.
 - In una futura esecuzione reale resterebbero **sempre** i costi di rete Solana, priority fee,
   commissioni DEX/aggregatore, rent degli account, impatto e slippage. In PAPER sono simulati.
 
@@ -187,7 +204,8 @@ tests/  examples/  scripts/  docs/
   PumpSwap, Phoenix): altri programmi vengono ignorati (fail-closed).
 - Prezzi DEX Screener senza orario nativo: si usa l'orario del fetch.
 - Il P&L simulato può essere migliore del reale (MEV, transazioni fallite, latenza reale).
-- Modalità live **non implementata** (vedi checklist).
+- Live: verificato con Jupiter/RPC simulati e con transazioni Jupiter reali ispezionate e simulate senza
+  firma; la prima esecuzione firmata avviene sul tuo Mac con i tuoi fondi: parti con i limiti minimi.
 
 ## Risoluzione problemi
 

@@ -51,6 +51,7 @@
   {% else %}
   <div class="banner-paper" role="note">PAPER su mainnet in sola lettura: P&amp;L <strong>virtuale</strong>, non è un saldo reale.</div>
   {% endif %}
+  {% if live_armed %}<div class="banner-safe" role="alert">LIVE ARMATO — il bot opera con SOLDI VERI entro i limiti configurati. <a href="/live">Dettagli e DISARMA</a></div>{% endif %}
   {% if state == 'SAFE' %}<div class="banner-safe" role="alert">Modalità sicura attiva: nuovi acquisti bloccati finché un umano non preme RIPRENDI. Controlla la pagina Rischi.</div>{% endif %}
   <h1>{{ title|default('Panoramica') }}</h1>
   {% block content %}{% endblock %}

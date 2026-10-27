@@ -23,6 +23,16 @@ USO
 - Mentre il motore è attivo l'app impedisce lo stop per inattività del Mac (caffeinate).
 - "Apri all'accesso" avvia l'app automaticamente al login.
 
+LIVE CON SOLDI VERI (OPZIONALE)
+- Spento di default. Menu "M4" → "Live (soldi veri)" → "Importa chiave wallet…": incolla la chiave
+  PRIVATA (es. esportata da Fomo con FaceID) nel campo nascosto: resta solo nel Portachiavi del Mac.
+  Controlla che l'indirizzo mostrato sia quello del tuo wallet Fomo.
+- Riavvia il motore, poi "Verifica (preflight)" e "ARMA LIVE…" (digita ARMA LIVE).
+- Limiti di default: 0,05 SOL per acquisto, 0,2 SOL al giorno. Si disarma a ogni riavvio.
+- Notifiche sul telefono: installa l'app ntfy e iscriviti al topic NTFY_TOPIC scritto nel file .env
+  della cartella dati; in config.yaml imposta notify.enabled: true.
+- Puoi perdere l'intero importo impiegato. Guida: docs/LIVE_CHECKLIST.md nel repository.
+
 DATI E CONFIGURAZIONE
 - Dati, config.yaml e .env:  ~/Library/Application Support/M4 CopyDesk/
 - Log:                       ~/Library/Logs/M4 CopyDesk/

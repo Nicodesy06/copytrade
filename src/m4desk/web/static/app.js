@@ -46,7 +46,31 @@
     } catch (e) { /* server non raggiungibile: si riprova */ } finally { busy = false; }
   }
 
+  async function liveAction(btn) {
+    const what = btn.dataset.live;
+    let body = {};
+    if (what === "arm") {
+      const t = window.prompt('ESECUZIONE REALE con soldi veri.\nIl bot comprerà e venderà da solo entro i limiti configurati.\nPer confermare digita: ARMA LIVE');
+      if (t === null) return;
+      body = { confirm: t };
+    } else if (!window.confirm("Disarmare il live? Nessun nuovo acquisto reale; le vendite protettive restano attive.")) {
+      return;
+    }
+    btn.disabled = true;
+    try {
+      const r = await fetch("/api/live/" + what, {
+        method: "POST", headers: { "Content-Type": "application/json", "X-M4-Token": token() },
+        body: JSON.stringify(body), credentials: "same-origin",
+      });
+      const j = await r.json().catch(() => ({}));
+      window.alert(r.ok ? (j.messaggio || "Fatto") : ("Rifiutato: " + (j.detail || r.status)));
+      await refresh(true);
+    } finally { btn.disabled = false; }
+  }
+
   document.addEventListener("click", (ev) => {
+    const lb = ev.target.closest("button[data-live]");
+    if (lb) { ev.preventDefault(); liveAction(lb); return; }
     const b = ev.target.closest("button[data-action]");
     if (b) { ev.preventDefault(); control(b); return; }
     if (ev.target.closest("#theme-toggle")) {

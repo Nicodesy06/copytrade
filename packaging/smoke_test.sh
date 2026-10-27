@@ -13,6 +13,9 @@ grep -q "SIMULATO / DATI DI ESEMPIO" /tmp/m4-demo.txt
 "$BIN" report --db demo | grep -q "Report giornaliero"
 "$BIN" status --db demo
 if "$BIN" run --mode live 2>/dev/null; then echo "ERRORE: la modalità live non deve partire"; exit 1; fi
+"$BIN" live status | grep -q "DISABILITATO"
+"$BIN" live --help >/dev/null
+grep -q "^NTFY_TOPIC=m4desk-" "$M4DESK_HOME/.env"
 
 "$BIN" --headless --port "$PORT" > "$M4DESK_HOME/headless.log" 2>&1 &
 PID=$!

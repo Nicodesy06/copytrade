@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% set title = "Live (soldi veri)" %}
+{% block content %}
+<section class="card">
+  {% if not live_enabled %}
+    <p><span class="tag skip">DISABILITATO</span> L'esecuzione reale è spenta (<code>live_enabled: false</code>). Il sistema opera solo in PAPER.</p>
+    <p class="small muted">Per attivarla: <code>m4desk live import-key</code> (chiave nel Portachiavi), poi in <code>config.yaml</code> <code>live_enabled: true</code>, <code>network: solana-mainnet</code>, <code>live.wallet_pubkey</code>; riavvia il motore e arma il live.</p>
+  {% else %}
+  <div class="kpis">
+    <div class="card kpi"><span class="label">Stato</span><span class="value {{ 'neg' if armed else '' }}">{{ 'ARMATO' if armed else 'disarmato' }}</span><span class="sub">{{ 'compra e vende da solo con soldi veri' if armed else 'nessun nuovo acquisto reale; vendite protettive attive' if lcfg.allow_exits_when_disarmed else 'nessuna operazione reale' }}</span></div>
+    <div class="card kpi"><span class="label">Wallet</span><span class="value small"><a href="https://solscan.io/account/{{ lcfg.wallet_pubkey }}" rel="noreferrer noopener" target="_blank">{{ lcfg.wallet_pubkey|short(6) }}</a></span><span class="sub">chiave nel Portachiavi di macOS</span></div>
+    <div class="card kpi"><span class="label">Speso oggi</span><span class="value">{{ spent_today|num(4) }} SOL</span><span class="sub">tetto {{ lcfg.max_sol_per_day }} SOL · {{ lcfg.max_sol_per_trade }} SOL per acquisto</span></div>
+    <div class="card kpi"><span class="label">Notifiche telefono</span><span class="value">{{ 'attive' if notify_enabled else 'spente' }}</span><span class="sub">ntfy</span></div>
+  </div>
+  <div class="controls" role="group" aria-label="Controlli live">
+    <button type="button" class="btn danger" data-live="arm">ARMA LIVE</button>
+    <button type="button" class="btn warn" data-live="disarm">DISARMA LIVE</button>
+  </div>
+  <p class="small muted">Si disarma da solo a ogni riavvio del motore, in modalità SICURA, con il sistema in pausa/arrestato o dopo {{ lcfg.max_consecutive_failures }} errori. Ogni transazione è ispezionata e simulata prima della firma. Puoi perdere l'intero importo impiegato.</p>
+  {% endif %}
+</section>
+<section class="card">
+  <h2>Posizioni reali del bot</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Token</th><th>Stato</th><th class="r">Quantità (raw)</th><th class="r">Costo SOL</th><th class="r">Incasso SOL</th><th class="r">P&amp;L SOL</th><th>Aperta</th></tr></thead>
+    <tbody>{% for p in positions %}<tr><td>{{ symbols.get(p.mint) or p.mint|short }}</td><td><span class="tag {{ 'copy' if p.status == 'OPEN' else '' }}">{{ p.status }}</span></td><td class="r">{{ p.qty_raw }}</td><td class="r">{{ (p.cost_lamports/1e9)|num(4) }}</td><td class="r">{{ (p.proceeds_lamports/1e9)|num(4) }}</td><td class="r">{% if p.status == 'CLOSED' %}{{ ((p.proceeds_lamports - p.cost_lamports)/1e9)|num(4) }}{% else %}—{% endif %}</td><td class="small">{{ p.opened_at.strftime('%d/%m %H:%M') }}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">Nessuna posizione reale.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>Ordini reali</h2>
+  <div class="tablewrap"><table class="compact">
+    <thead><tr><th>Ora</th><th>Lato</th><th>Token</th><th>Stato</th><th>Motivo</th><th class="r">Speso/incassato SOL</th><th>Transazione</th></tr></thead>
+    <tbody>{% for o in orders %}<tr><td class="small">{{ o.created_at.strftime('%d/%m %H:%M:%S') }}</td><td>{{ o.side }}</td><td>{{ symbols.get(o.mint) or o.mint|short }}</td>
+      <td><span class="tag {{ 'copy' if o.state == 'SUCCESS' else 'skip' if o.state in ('FAILED','INSPECT_FAIL','SIM_FAIL','UNKNOWN') else '' }}">{{ o.state }}</span></td><td class="small">{{ o.reason }}{% if o.detail %}<br><span class="muted">{{ (o.detail.get('violations') or o.detail.get('problems') or [])|join('; ') }}</span>{% endif %}</td>
+      <td class="r">{{ ((o.sol_spent_lamports or 0)/1e9)|num(4) if o.sol_spent_lamports is not none else '—' }}</td>
+      <td class="small">{% if o.signature and o.state in ('SUCCESS','UNKNOWN','SUBMITTED') %}<a href="https://solscan.io/tx/{{ o.signature }}" target="_blank" rel="noreferrer noopener">{{ o.signature|short(6) }}</a>{% else %}—{% endif %}</td></tr>
+    {% else %}<tr><td colspan="7" class="muted">Nessun ordine reale.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

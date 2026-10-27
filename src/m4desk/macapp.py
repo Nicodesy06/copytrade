@@ -15,7 +15,6 @@ import json
 import logging
 import os
 import re
-import secrets
 import shutil
 import subprocess
 import sys
@@ -54,11 +53,10 @@ def bootstrap() -> Path:
         shutil.copy(PKG_DATA / "config.example.yaml", cfg)
     env = home / ".env"
     if not env.exists():
-        txt = (PKG_DATA / "env.example").read_text(encoding="utf-8")
-        txt = re.sub(r"^M4DESK_DASHBOARD_TOKEN=.*$", f"M4DESK_DASHBOARD_TOKEN={secrets.token_urlsafe(24)}", txt,
-                     flags=re.M)
-        env.write_text(txt, encoding="utf-8")
-    os.chmod(env, 0o600)
+        shutil.copy(PKG_DATA / "env.example", env)
+    from .config import ensure_env_secrets
+
+    ensure_env_secrets(env)
     os.chdir(home)
     return home
 
@@ -188,6 +186,75 @@ class Controller:
         self._db(self.paper_db).set_control("state", state, "human", f"app: {label}")
         return f"Stato: {label}"
 
+    # --- live (soldi veri) ------------------------------------------------------------
+    def reload_config(self) -> None:
+        from .config import load_config
+
+        self.cfg = load_config("config.yaml")
+
+    def live_armed(self) -> bool:
+        db = self._db(self.paper_db)
+        boot = db.get_meta("engine_boot_id")
+        return bool(boot) and db.get_control("live_armed", "") == boot
+
+    def import_key(self, secret: str) -> tuple[bool, str]:
+        """Salva la chiave nel Portachiavi e abilita il live in config.yaml (wallet atteso = chiave importata)."""
+        from .config import set_yaml_value
+        from .live import KeyStore, KeyStoreError
+
+        try:
+            pub = KeyStore().store(secret)
+        except KeyStoreError as e:
+            return False, f"Chiave non valida: {e}"
+        cfg = Path("config.yaml")
+        for k, v in (("live.wallet_pubkey", pub), ("live_enabled", "true"), ("network", "solana-mainnet")):
+            set_yaml_value(cfg, k, v)
+        self.reload_config()
+        return True, (f"Chiave salvata nel Portachiavi.\nIndirizzo: {pub}\nVerifica che sia lo stesso indirizzo "
+                      "Solana mostrato in Fomo. Riavvia il motore, poi usa ARMA LIVE.")
+
+    def _live(self):
+        from .cli import _live_executor
+
+        self.reload_config()
+        if not self.cfg.live_enabled:
+            return None
+        live, _ = _live_executor(self.cfg)
+        return live
+
+    def live_preflight(self) -> str:
+        live = self._live()
+        if live is None:
+            return "Live non abilitato: importa prima la chiave."
+        checks = asyncio.run(live.preflight())
+        return "\n".join(f"{'OK' if ok else 'ERRORE'} · {n}: {d}" for n, ok, d in checks)
+
+    def live_arm(self, confirm: str) -> str:
+        live = self._live()
+        if live is None:
+            return "Live non abilitato: importa prima la chiave."
+        if not self.engine_running():
+            return "Avvia prima il motore PAPER (il live replica i suoi ordini)."
+        ok, msg = asyncio.run(live.arm(confirm, "human:app"))
+        return msg
+
+    def live_disarm(self) -> str:
+        live = self._live()
+        if live is not None:
+            live.disarm("menu dell'app", "human:app")
+        return "Live disarmato: nessun nuovo acquisto reale."
+
+    def forget_key(self) -> str:
+        from .config import set_yaml_value
+        from .live import KeyStore
+
+        self.live_disarm()
+        KeyStore().forget()
+        set_yaml_value(Path("config.yaml"), "live_enabled", "false")
+        set_yaml_value(Path("config.yaml"), "network", "solana-mainnet-readonly")
+        self.reload_config()
+        return "Chiave rimossa e live disabilitato. Riavvia il motore."
+
     def _keep_awake(self, on: bool) -> None:
         """Su macOS impedisce lo stop per inattività mentre il motore gira (caffeinate -i)."""
         if sys.platform != "darwin":
@@ -245,6 +312,15 @@ def run_menubar(ctl: Controller) -> None:
             super().__init__(APP_NAME, title="M4", quit_button=None)
             self.engine_item = rumps.MenuItem("Avvia motore PAPER", callback=self.toggle_engine)
             self.login_item = rumps.MenuItem("Apri all'accesso", callback=self.toggle_login)
+            live_menu = rumps.MenuItem("Live (soldi veri)")
+            live_menu.update([
+                rumps.MenuItem("Importa chiave wallet…", callback=self.import_key),
+                rumps.MenuItem("Verifica (preflight)", callback=lambda _: rumps.alert(APP_NAME, ctl.live_preflight())),
+                rumps.MenuItem("ARMA LIVE…", callback=self.arm_live),
+                rumps.MenuItem("Disarma live", callback=lambda _: self.notify(ctl.live_disarm())),
+                None,
+                rumps.MenuItem("Rimuovi chiave", callback=self.forget_key),
+            ])
             self.login_item.state = int(login_item_enabled())
             self.menu = [
                 rumps.MenuItem("Apri dashboard", callback=lambda _: webbrowser.open(ctl.url())),
@@ -255,6 +331,7 @@ def run_menubar(ctl: Controller) -> None:
                 rumps.MenuItem("Riprendi", callback=lambda _: self.notify(
                     ctl.set_state(SystemState.RUNNING.value, "RIPRENDI"))),
                 rumps.MenuItem("Aggiungi wallet pubblico…", callback=self.add_wallet),
+                live_menu,
                 None,
                 rumps.MenuItem("Riesegui demo (dati sintetici)", callback=self.rerun_demo),
                 rumps.MenuItem("Apri cartella dati", callback=lambda _: subprocess.run(  # noqa: S603
@@ -274,7 +351,7 @@ def run_menubar(ctl: Controller) -> None:
         def refresh(self, _=None) -> None:
             running = ctl.engine_running()
             self.engine_item.title = "Arresta motore PAPER" if running else "Avvia motore PAPER"
-            self.title = "M4 ●" if running else "M4"
+            self.title = ("M4 ● LIVE" if ctl.live_armed() else "M4 ●") if running else "M4"
             if ctl.engine_error:
                 self.notify(f"Motore fermato: {ctl.engine_error[:120]}")
                 ctl.engine_error = None
@@ -289,6 +366,32 @@ def run_menubar(ctl: Controller) -> None:
             r = w.run()
             if r.clicked and r.text.strip():
                 rumps.alert(APP_NAME, ctl.add_wallet(r.text))
+
+        def import_key(self, _) -> None:
+            rumps.alert(APP_NAME, "ATTENZIONE: con la chiave il bot potrà comprare e vendere con soldi veri dal "
+                        "wallet, entro i limiti di config.yaml. La chiave resta solo nel Portachiavi del Mac. "
+                        "Non incollarla mai altrove.")
+            w = rumps.Window("Chiave PRIVATA del wallet Solana (base58 o array JSON). Non la seed phrase.",
+                             "Importa chiave", ok="Salva nel Portachiavi", cancel="Annulla", dimensions=(360, 24),
+                             secure=True)
+            r = w.run()
+            if r.clicked and r.text.strip():
+                ok, msg = ctl.import_key(r.text)
+                rumps.alert(APP_NAME, msg)
+
+        def arm_live(self, _) -> None:
+            w = rumps.Window('ESECUZIONE REALE: il bot comprerà e venderà da solo con soldi veri.\n'
+                             'Per confermare digita: ARMA LIVE', "ARMA LIVE", ok="Arma", cancel="Annulla",
+                             dimensions=(260, 24))
+            r = w.run()
+            if r.clicked:
+                rumps.alert(APP_NAME, ctl.live_arm(r.text))
+                self.refresh()
+
+        def forget_key(self, _) -> None:
+            if rumps.alert(APP_NAME, "Rimuovere la chiave dal Portachiavi e disabilitare il live?", ok="Rimuovi",
+                           cancel="Annulla") == 1:
+                rumps.alert(APP_NAME, ctl.forget_key())
 
         def rerun_demo(self, _) -> None:
             ctl.ensure_demo(force=True)

@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from .clock import Clock, SimClock
 from .config import AppConfig
@@ -53,6 +54,8 @@ class Runtime:
     feed_breaker: LagBreaker
     quote_breaker: LagBreaker
     alerts: list[str] = field(default_factory=list)
+    live: Any = None  # LiveExecutor opzionale (solo con live_enabled)
+    notifier: Any = None
 
     # --- stato del sistema (letto dal DB: comandi da CLI/dashboard valgono subito) ---
     def system_state(self) -> SystemState:
@@ -73,6 +76,10 @@ class Runtime:
             return
         self.set_state(SystemState.SAFE, actor, reason)
         self.alerts.append(reason)
+        if self.live is not None:
+            self.live.disarm(f"modalità SAFE: {reason}")
+        if self.notifier is not None:
+            await self.notifier.send("M4 CopyDesk: modalità SICURA", reason[:300], "high", "warning")
         now = self.clock.now()
         await self.bus.publish(
             make_event(EventType.STATE_CHANGE, actor, ("SAFE", now.isoformat(), reason), self.origin, "system",

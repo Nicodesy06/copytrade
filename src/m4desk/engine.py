@@ -172,6 +172,13 @@ def build_paper_engine(cfg: AppConfig, secrets: Secrets, db_path: str | Path) ->
     rt = build_runtime(cfg, Mode.PAPER, DataOrigin.MAINNET_READONLY, db, clock, providers, llm)
     db.set_meta("llm_backend", f"ollama {cfg.llm.model}" if backend else "DISABILITATO")
     db.set_meta("rpc", "helius (free)" if pc.use_helius else "RPC pubblico Solana (non production-grade)")
+    from .live import build_live
+    from .services.notify import Notifier
+
+    topic = secrets.ntfy_topic.get_secret_value() if secrets.ntfy_topic else None
+    rt.notifier = Notifier(cfg.notify, topic)
+    rt.live = build_live(cfg, db, clock, secrets, rt.notifier)
+    db.set_meta("live", {"enabled": cfg.live_enabled, "wallet": cfg.live.wallet_pubkey})
     seeds = list(cfg.seed_wallets) + [w.address for w in db.list_wallets() if w.source == "manual"]
     return rt, Supervisor(rt, seeds)
 
@@ -180,6 +187,18 @@ async def run_paper(rt: Runtime, sup: Supervisor) -> None:
     cfg = rt.cfg
     await sup.start()
     gap = GapFiller(rt)
+    if rt.live is not None:
+        rt.live.disarm("riavvio del motore: serve un nuovo ARMA LIVE", "supervisor")
+        await rt.live.recover()
+
+    async def live_guard() -> None:
+        """Vendite live in sospeso ritentate; disarmo se il sistema non è più RUNNING."""
+        if rt.live is None:
+            await asyncio.sleep(3600)
+            return
+        if rt.live.is_armed() and rt.system_state().value != "RUNNING":
+            rt.live.disarm(f"stato sistema {rt.system_state().value}")
+        await rt.live.retry_pending_exits()
 
     async def discovery() -> None:
         await sup.discovery.cycle()  # i nuovi candidati vengono valutati dal TraderAnalyst via evento
@@ -221,6 +240,7 @@ async def run_paper(rt: Runtime, sup: Supervisor) -> None:
     sup.supervise("ingest", ingest, cfg.providers.poll_interval_s)
     sup.supervise("prices", prices, cfg.providers.price_refresh_s)
     sup.supervise("audit", audit, 60)
+    sup.supervise("live", live_guard, 60)
 
     ws_url = cfg.providers.rpc_ws_url
     if cfg.providers.use_helius and rt.providers.chain is not None:

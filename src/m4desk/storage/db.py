@@ -318,6 +318,43 @@ class Reservation(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
+class LiveOrder(Base):
+    """Ordine REALE. Fasi: PREPARED → (INSPECT_FAIL | SIM_FAIL | SUBMITTED) → SUCCESS | FAILED | UNKNOWN."""
+
+    __tablename__ = "live_orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    idempotency_key: Mapped[str] = mapped_column(String(96), unique=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, index=True)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    side: Mapped[str] = mapped_column(String(8))
+    mint: Mapped[str] = mapped_column(String(64))
+    leader: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    paper_order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    state: Mapped[str] = mapped_column(String(16), index=True)
+    reason: Mapped[str] = mapped_column(String(64))
+    in_amount_raw: Mapped[int | None] = mapped_column(BigIntStr, nullable=True)
+    out_amount_raw: Mapped[int | None] = mapped_column(BigIntStr, nullable=True)
+    sol_spent_lamports: Mapped[int | None] = mapped_column(BigIntStr, nullable=True)
+    signature: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    detail: Mapped[Any] = mapped_column(JSONText, nullable=True)
+
+
+class LivePosition(Base):
+    """Quantità acquistate DAL BOT (mai i token che l'utente detiene per conto suo)."""
+
+    __tablename__ = "live_positions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    mint: Mapped[str] = mapped_column(String(64), index=True)
+    leader: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(8), index=True)  # OPEN | CLOSED
+    opened_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    qty_raw: Mapped[int] = mapped_column(BigIntStr)
+    cost_lamports: Mapped[int] = mapped_column(BigIntStr)
+    proceeds_lamports: Mapped[int] = mapped_column(BigIntStr)
+
+
 class Report(Base):
     __tablename__ = "reports"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

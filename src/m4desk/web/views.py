@@ -77,6 +77,8 @@ class Views:
             "fixture": self.db.get_meta("fixture"),
             "now": self.now(),
             "llm_backend": self.db.get_meta("llm_backend", "-"),
+            "live_armed": bool(self.db.get_meta("engine_boot_id"))
+            and self.db.get_control("live_armed", "") == self.db.get_meta("engine_boot_id"),
         }
 
     def labels(self) -> dict[str, str]:
@@ -253,6 +255,23 @@ class Views:
         c = self.common()
         return {**c, "cfg": self.cfg, "public": self.db.get_meta("config_public") or {},
                 "rpc": self.db.get_meta("rpc", "fixture (offline)")}
+
+    def live(self) -> dict[str, Any]:
+        from ..storage.db import LiveOrder, LivePosition
+
+        c = self.common()
+        with self.db.session() as s:
+            orders = list(s.scalars(select(LiveOrder).order_by(LiveOrder.id.desc()).limit(200)))
+            positions = list(s.scalars(select(LivePosition).order_by(LivePosition.id.desc())))
+            symbols = {t.mint: t.symbol for t in s.scalars(select(TokenCheck)) if t.symbol}
+        boot = self.db.get_meta("engine_boot_id")
+        armed = bool(boot) and self.db.get_control("live_armed", "") == boot
+        day = datetime.now(UTC).strftime("%Y-%m-%d")
+        spent = sum(int(o.sol_spent_lamports or 0) for o in orders if o.side == "BUY" and o.state in (
+            "SUBMITTED", "SUCCESS", "UNKNOWN") and o.created_at.strftime("%Y-%m-%d") == day) / 1e9
+        return {**c, "lcfg": self.cfg.live, "live_enabled": self.cfg.live_enabled, "armed": armed,
+                "orders": orders, "positions": positions, "spent_today": spent, "symbols": symbols,
+                "notify_enabled": self.cfg.notify.enabled}
 
     def state_json(self) -> dict[str, Any]:
         c = self.common()

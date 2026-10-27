@@ -96,3 +96,26 @@ def test_dashboard_db_switch(home):
 
 def test_login_item_requires_installed_app(home):
     assert "solo dall'app installata" in macapp.set_login_item(True)
+
+
+def test_app_import_key_enables_live_and_forget(home, monkeypatch):
+    from solders.keypair import Keypair
+
+    from m4desk.live import keystore
+    from m4desk.live.keystore import MemoryBackend, _b58encode
+
+    mem = MemoryBackend()
+    monkeypatch.setattr(keystore, "default_backend", lambda: mem)
+    macapp.bootstrap()
+    ctl = macapp.Controller()
+    ok, msg = ctl.import_key("non una chiave")
+    assert not ok
+    kp = Keypair()
+    ok, msg = ctl.import_key(_b58encode(bytes(kp)))
+    assert ok and str(kp.pubkey()) in msg
+    assert ctl.cfg.live_enabled and ctl.cfg.network == "solana-mainnet"
+    assert ctl.cfg.live.wallet_pubkey == str(kp.pubkey())
+    assert "Avvia prima il motore" in ctl.live_arm("ARMA LIVE")
+    assert not ctl.live_armed()
+    assert "rimossa" in ctl.forget_key()
+    assert not ctl.cfg.live_enabled and mem.data == {}

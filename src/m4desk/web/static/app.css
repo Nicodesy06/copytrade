@@ -34,6 +34,9 @@ pre { white-space: pre-wrap; word-break: break-word; }
 .sidebar nav a:hover { background: var(--panel-2); text-decoration: none; }
 .sidebar nav a.active { background: var(--accent); color: #fff; }
 .side-foot { margin-top: auto; padding: 0 8px; }
+.dbsel { margin-top: 18px; padding: 10px 8px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--line); }
+.dbsel a { color: var(--text); padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+.dbsel a.active { background: var(--panel-2); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
 main { padding: 22px 32px 40px; min-width: 0; }
 h1 { font-size: 30px; letter-spacing: -.02em; margin: 18px 0 16px; }
 h2 { font-size: 17px; margin: 0 0 12px; letter-spacing: -.01em; }
@@ -106,7 +109,9 @@ footer { margin-top: 24px; text-align: center; }
   .sidebar { position: static; height: auto; flex-direction: row; align-items: center; gap: 8px; padding: 10px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .sidebar nav { flex-direction: row; }
   .sidebar nav a { white-space: nowrap; }
-  .brand { padding: 0 8px 0 0; } .brand span, .side-foot p { display: none; }
+  .brand { padding: 0 8px 0 0; } .brand span, .side-foot p, .dbsel span { display: none; }
+  .dbsel { margin: 0; padding: 0; border: 0; flex-direction: row; }
+  .dbsel a { white-space: nowrap; }
   .side-foot { margin: 0; }
   main { padding: 14px; }
   .grid2, .grid-side { grid-template-columns: 1fr; }

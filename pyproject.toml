@@ -26,12 +26,13 @@ dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.6"]
 
 [project.scripts]
 m4desk = "m4desk.cli:main"
+m4desk-app = "m4desk.macapp:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-m4desk = ["web/templates/*.html", "web/static/*", "data/*.json"]
+m4desk = ["web/templates/*.html", "web/static/*", "data/*.json", "data/*.yaml", "data/env.example"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

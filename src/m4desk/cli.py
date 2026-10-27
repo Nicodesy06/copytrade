@@ -122,6 +122,8 @@ def cmd_init(args) -> int:
         s, d = cwd / src, cwd / dst
         if not s.exists():
             s = ROOT_FILES / src
+        if not s.exists():  # installazione da pacchetto/app: copie incluse nel pacchetto
+            s = Path(__file__).parent / "data" / ("env.example" if src == ".env.example" else src)
         if d.exists():
             print(f"{dst} esiste già: non sovrascritto")
         elif s.exists():

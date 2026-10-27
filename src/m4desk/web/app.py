@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -96,9 +96,15 @@ class LocalHostOnly(BaseHTTPMiddleware):
         return resp
 
 
-def create_app(db_path: str | Path, cfg: AppConfig, secrets: Secrets) -> FastAPI:
-    db = Database(db_path)
-    views = Views(db, cfg)
+DB_LABELS = {"paper": "PAPER (mainnet)", "demo": "DEMO (simulato)", "replay": "REPLAY"}
+
+
+def create_app(db_paths: str | Path | dict[str, Path], cfg: AppConfig, secrets: Secrets) -> FastAPI:
+    """`db_paths` può essere un solo DB o più DB selezionabili (es. paper + demo nell'app macOS)."""
+    paths = db_paths if isinstance(db_paths, dict) else {"default": Path(db_paths)}
+    dbs = {name: Database(p) for name, p in paths.items()}
+    views_by_db = {name: Views(d, cfg) for name, d in dbs.items()}
+    first = next(iter(dbs))
     token = _token(secrets, Path(cfg.data_dir))
     app = FastAPI(title="M4 CopyDesk", docs_url=None, redoc_url=None, openapi_url=None)
     allowed = {"127.0.0.1", "localhost", "::1", "testserver"}
@@ -110,60 +116,78 @@ def create_app(db_path: str | Path, cfg: AppConfig, secrets: Secrets) -> FastAPI
     tpl.env.filters.update(usd=usd, num=num, pct=pct, short=short, reason=reason_it)
     tpl.env.globals.update(nav=NAV)
 
+    def current(request: Request) -> str:
+        name = request.cookies.get("m4db", first)
+        return name if name in dbs else first
+
+    def V(request: Request) -> Views:  # noqa: N802
+        return views_by_db[current(request)]
+
     def render(request: Request, name: str, ctx: dict[str, Any], active: str) -> HTMLResponse:
         partial = request.query_params.get("partial") == "1"
-        return tpl.TemplateResponse(request, name, {**ctx, "active": active, "partial": partial, "csrf": token})
+        choices = [(n, DB_LABELS.get(n, n)) for n in dbs] if len(dbs) > 1 else []
+        return tpl.TemplateResponse(request, name, {**ctx, "active": active, "partial": partial, "csrf": token,
+                                                    "db_choices": choices, "db_current": current(request)})
+
+    @app.get("/db/{name}")
+    def choose_db(name: str):
+        if name not in dbs:
+            raise HTTPException(404, "database sconosciuto")
+        resp = RedirectResponse("/", status_code=303)
+        resp.set_cookie("m4db", name, httponly=True, samesite="strict")
+        return resp
 
     @app.get("/", response_class=HTMLResponse)
     def overview(request: Request):
-        return render(request, "overview.html", views.overview(), "/")
+        return render(request, "overview.html", V(request).overview(), "/")
 
     @app.get("/agenti", response_class=HTMLResponse)
     def agents(request: Request):
-        return render(request, "agents.html", views.agents(), "/agenti")
+        return render(request, "agents.html", V(request).agents(), "/agenti")
 
     @app.get("/trader", response_class=HTMLResponse)
     def traders(request: Request):
-        return render(request, "traders.html", views.traders(), "/trader")
+        return render(request, "traders.html", V(request).traders(), "/trader")
 
     @app.get("/token", response_class=HTMLResponse)
     def tokens(request: Request):
-        return render(request, "tokens.html", views.tokens(), "/token")
+        return render(request, "tokens.html", V(request).tokens(), "/token")
 
     @app.get("/operazioni", response_class=HTMLResponse)
     def operations(request: Request, s: str | None = None):
-        return render(request, "operations.html", views.operations(s), "/operazioni")
+        return render(request, "operations.html", V(request).operations(s), "/operazioni")
 
     @app.get("/portafoglio", response_class=HTMLResponse)
     def portfolio(request: Request, s: str | None = None):
-        return render(request, "portfolio.html", views.portfolio(s), "/portafoglio")
+        return render(request, "portfolio.html", V(request).portfolio(s), "/portafoglio")
 
     @app.get("/rischi", response_class=HTMLResponse)
     def risks(request: Request):
-        return render(request, "risks.html", views.risks(), "/rischi")
+        return render(request, "risks.html", V(request).risks(), "/rischi")
 
     @app.get("/report", response_class=HTMLResponse)
     def reports(request: Request, id: int | None = None):
-        return render(request, "reports.html", views.reports(id), "/report")
+        return render(request, "reports.html", V(request).reports(id), "/report")
 
     @app.get("/impostazioni", response_class=HTMLResponse)
     def settings(request: Request):
-        return render(request, "settings.html", views.settings(), "/impostazioni")
+        return render(request, "settings.html", V(request).settings(), "/impostazioni")
 
     @app.get("/log", response_class=HTMLResponse)
     def logs(request: Request, level: str | None = None):
-        return render(request, "logs.html", views.logs(level), "/log")
+        return render(request, "logs.html", V(request).logs(level), "/log")
 
     @app.get("/api/state")
-    def state():
-        return views.state_json()
+    def state(request: Request):
+        return V(request).state_json()
 
     @app.get("/health")
     def health():
-        return {"ok": True}
+        return {"ok": True, "app": "m4desk"}
 
     @app.post("/api/control/{action}")
     async def control(action: str, request: Request):
+        db = dbs[current(request)]
         if action not in ACTIONS:
             raise HTTPException(404, "azione sconosciuta")
         sent = request.headers.get("x-m4-token", "")
@@ -184,5 +208,6 @@ def create_app(db_path: str | Path, cfg: AppConfig, secrets: Secrets) -> FastAPI
         return {"ok": True, "stato": state_.value, "azione": label}
 
     app.state.token = token
-    app.state.db = db
+    app.state.db = dbs[first]
+    app.state.dbs = dbs
     return app

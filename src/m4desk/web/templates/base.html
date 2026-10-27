@@ -19,6 +19,12 @@
       <a href="{{ href }}" class="{{ 'active' if active == href else '' }}" {% if active == href %}aria-current="page"{% endif %}>{{ label }}</a>
       {% endfor %}
     </nav>
+    {% if db_choices %}
+    <div class="dbsel" role="group" aria-label="Dati visualizzati">
+      <span class="muted small">Dati</span>
+      {% for n, l in db_choices %}<a href="/db/{{ n }}" class="{{ 'active' if n == db_current else '' }}">{{ l }}</a>{% endfor %}
+    </div>
+    {% endif %}
     <div class="side-foot">
       <button type="button" class="ghost" id="theme-toggle" aria-label="Cambia tema chiaro/scuro">◐ Tema</button>
       <p class="muted small">Solo ricerca. Nessuna transazione reale.</p>

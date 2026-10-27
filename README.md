@@ -29,7 +29,24 @@ nessuna transazione reale, nessuna chiave di wallet, P&L su capitale **virtuale*
 | **Token** | **Trader (tema scuro)** |
 | ![Token](docs/img/token.png) | ![Trader](docs/img/trader-scuro.png) |
 
-## Installazione (macOS, zsh)
+## App per Mac (.dmg)
+
+Il `.dmg` per Apple Silicon viene compilato su un runner macOS di GitHub Actions
+(`.github/workflows/macos-dmg.yml`, gratuito per repository pubblici) o in locale con:
+
+```zsh
+packaging/build_macos.sh          # crea build/M4-CopyDesk-<versione>-macOS-arm64.dmg (+ .sha256)
+```
+
+L'app vive nella barra dei menu ("M4"): apre la dashboard locale, esegue la demo al primo avvio,
+avvia/arresta il motore PAPER, aggiunge wallet pubblici, PAUSA/RIPRENDI, avvio al login, e impedisce
+lo stop per inattività mentre il motore gira. Dati in `~/Library/Application Support/M4 CopyDesk/`.
+L'app è firmata ad-hoc ma **non notarizzata** (servirebbe un account Apple a pagamento): al primo
+avvio usa clic destro → Apri. Istruzioni complete in [packaging/LEGGIMI.txt](packaging/LEGGIMI.txt).
+Lo stesso eseguibile funziona da riga di comando:
+`"/Applications/M4 CopyDesk.app/Contents/MacOS/M4 CopyDesk" doctor`.
+
+## Installazione da sorgente (macOS, zsh)
 
 ```zsh
 git clone <URL-del-repository> m4-copydesk && cd m4-copydesk

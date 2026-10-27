@@ -1,0 +1,43 @@
+M4 CopyDesk — ricerca copy-trading Solana, solo PAPER
+=====================================================
+
+Nessuna transazione reale, nessuna chiave di wallet, P&L su capitale VIRTUALE.
+Non è una promessa di rendimento. €0 di abbonamenti (provider gratuiti + LLM locale opzionale).
+
+INSTALLAZIONE
+1. Trascina "M4 CopyDesk" nella cartella Applicazioni.
+2. Primo avvio: l'app è firmata ad-hoc ma NON notarizzata (la notarizzazione richiede un account
+   Apple a pagamento). macOS mostrerà un avviso. Per aprirla:
+   - clic destro sull'app → Apri → Apri; oppure
+   - Impostazioni di Sistema → Privacy e sicurezza → "Apri comunque"; oppure, da Terminale:
+       xattr -dr com.apple.quarantine "/Applications/M4 CopyDesk.app"
+3. All'avvio compare "M4" nella barra dei menu e si apre la dashboard su http://127.0.0.1:8765
+   (solo locale, mai esposta su Internet). Al primo avvio viene eseguita la DEMO con dati
+   sintetici (etichettati SIMULATO / DATI DI ESEMPIO).
+
+USO
+- Menu "M4" → "Aggiungi wallet pubblico…": inserisci un indirizzo PUBBLICO Solana
+  (MAI chiavi private o seed phrase), poi "Avvia motore PAPER".
+- Nella dashboard, in basso a sinistra, scegli i dati: PAPER (mainnet) o DEMO (simulato).
+- PAUSA NUOVI ACQUISTI / RIPRENDI / ARRESTA sono nella dashboard e nel menu.
+- Mentre il motore è attivo l'app impedisce lo stop per inattività del Mac (caffeinate).
+- "Apri all'accesso" avvia l'app automaticamente al login.
+
+DATI E CONFIGURAZIONE
+- Dati, config.yaml e .env:  ~/Library/Application Support/M4 CopyDesk/
+- Log:                       ~/Library/Logs/M4 CopyDesk/
+- Consigliato: chiave GRATUITA Helius (nessuna carta) in .env → HELIUS_API_KEY=...
+  e in config.yaml → providers.use_helius: true. L'RPC pubblico risponde spesso 429.
+- LLM opzionale: installa Ollama ed esegui `ollama pull qwen3.5:9b`.
+
+RIGA DI COMANDO (stessi dati dell'app)
+  alias m4desk='"/Applications/M4 CopyDesk.app/Contents/MacOS/M4 CopyDesk"'
+  m4desk doctor · m4desk status · m4desk report · m4desk test-providers · m4desk --help
+
+DISINSTALLAZIONE
+  Esci dal menu "M4", trascina l'app nel Cestino. Per cancellare anche i dati:
+  rm -rf ~/Library/Application\ Support/M4\ CopyDesk ~/Library/Logs/M4\ CopyDesk
+  rm -f ~/Library/LaunchAgents/com.m4copydesk.app.plist
+
+Le operazioni reali (non supportate da questa versione) avrebbero comunque costi di rete,
+priority fee, commissioni DEX, rent e slippage.
